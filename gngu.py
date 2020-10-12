@@ -1,0 +1,194 @@
+from graph_tool.all import *
+import numpy as np
+
+class GNGU():
+    '''
+    Growing Neural Gas with Utility implementation 
+    from Fritzke, 1997
+
+    Steps:
+        1. Update: update winner node properties and discount errors
+        2. Adapt
+        3. Refine
+        4. Add
+
+    Attributes:
+        e_w (float): Fraction of distance to move the winner node towards the current signal
+        e_n (float): Fraction of distance to move the neighbors of the winner node towards the current signal
+        i (int): Current number of iterations
+        l (int): Number of iterations for new node insertions (fixed insertion rate)
+        a (float): Local error discount parameter for nodes with largest and neighboring largest errors after insertion
+        b (float): Global error discount parameter
+        k (float): Utility removal sensitiveness, lower = frequent deletions, for stability k has to be a little higher than the mean U/error ratio
+        max_nodes (int): Maximum number of nodes allowed in the GNG
+        max_age (int): Maximum age an edge can reach before removal
+    '''
+
+    def __init__(self, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
+        
+        self.g = Graph(directed=False)
+        self.e_w = e_w
+        self.e_n = e_n
+        self.l = l
+        self.a = a 
+        self.b = b
+        self.k = k
+        self.max_nodes = max_nodes
+        self.max_age = max_age
+        self.i = 0
+
+        # Property maps for graph and edge variables
+        self.g.ep.age = self.g.new_edge_property("int")
+        self.g.vp.utility = self.g.new_vertex_property("float")
+        self.g.vp.error = self.g.new_vertex_property("float")
+        self.g.vp.action = self.g.new_vertex_property("string")
+        self.g.vp.pos = self.g.new_vertex_property("vector<double>")
+
+        # graph-tools properties
+        self.g.set_fast_edge_removal(fast=True)
+
+    def _nearest_neighbors(self, s):
+        '''
+        Return the two closest nodes to s and updates error
+        '''
+        all_pos = self.g.vp.pos.get_2d_array([0, 1])
+
+        # Squared distance
+        distances = np.sum((all_pos.T - s) ** 2, axis=1)
+        winner, second, *_ = np.argpartition(distances, 1) # TODO: check if kDTree search is faster than np.argpartition 
+
+        error_w = distances[winner]
+        error_s = distances[second]
+
+        return winner, second, error_w, error_s
+
+    def _update_winner(self, s):
+        '''
+        Updates age, error and utility of the winner node.
+        '''
+
+        if len(self.g.get_vertices()) < 2:
+            v = self.g.add_vertex()
+            self.g.vp.error[v] = 0.0
+            self.g.vp.utility[v] = 0.0
+            self.g.vp.pos[v] = s
+
+        else:
+            winner, second, error_w, error_s = self._nearest_neighbors(s)
+
+            self.g.vp.error[winner] += error_w # Error update
+            self.g.vp.utility[winner] += error_s - error_w # Utility update
+
+            edges = g.get_all_edges(winner, eprops=[self.g.edge_index])
+            self.g.ep.age.a[edges[:,-1]] += 1 # Increment age of the winner's edges
+            
+        return winner, second
+
+    def _adapt_neighborhood(self, winner, second, s):
+        '''
+        Moves the winner node and its topological neighbors towards s, adds an edge between the two winner nodes
+        '''
+
+        # Moves winner
+        self.g.vp.pos[winner] += self.e_w*(s-self.g.vp.pos[winner])
+    
+        neighbors = self.g.get_all_neighbors(winner)
+        all_pos = self.g.vp.pos.get_2d_array([0, 1])
+
+        # Moves winner's neighbors
+        all_pos[:, neighbors] += self.e_n*(s-all_pos[:, neighbors])
+        self.g.vp.pos.set_2d_array(all_pos)
+
+        # Connects the winner nodes and resets the edge age to 0
+        e = self.g.edge(winner, second)
+        if not e:
+            e = self.g.add_edge(winner, second)
+        self.g.ep.age[e] = 0
+
+
+    def _prune_edges(self):
+        '''
+        Prunes edges with age exceeding max_age
+        '''
+
+        all_edges = self.g.get_edges(eprops=[self.g.ep.age, self.g.edge_index])
+
+        mask = all_edges[:, -2] >= self.max_age
+        old_edges = all_edges[mask, -1]
+
+        for e in old_edges:
+            self.g.remove_edge(e)
+
+    def _prune_nodes(self):
+        '''
+        Prunes nodes not connected to any edge and the node with the smallest utility if the highest error in the graph and smallest utility ratio is above k
+        '''
+
+        '''
+        # ML-GNG does this, but GNG-U doesn't
+        degrees = self.g.get_total_degrees(self.g.get_vertices())
+
+        nodes = np.argwhere(degrees==0).flatten()
+        self.g.remove_vertex(nodes, fast=True)
+        '''
+
+        nodes_props = self.g.get_vertices(vprops=[self.vp.utility, self.vp.error])
+
+        highest_error_node = np.argmax(nodes_props[:, -1], axis=0)
+        highest_error = nodes_props[highest_error_node, -1]
+        lowest_utility_node = np.argmin(nodes_props[:, -2], axis=0)
+        lowest_utility = nodes_props[lowest_utility_node, -2]
+        
+        if highest_error > k * lowest_utility:
+            self.g.remove_vertex(lowest_utility_node, fast=True)
+
+        return highest_error_node
+
+    def _add_node(self, highest_error_node):
+        '''
+        Add node to underrepresented areas according to the lambda insertion rate
+        '''
+        # TODO: error-based insertion rate (ie when mean squared error is larger than a threshold add node)
+
+        # maxErrorNode.getNeighborsNumber()>0
+        if i % self.l == 0 and len(self.g.vertices()) != self.max_nodes:
+            neighbors = self.g.get_all_neighbors(highest_error_node, vprops=[self.g.vp.error])
+            highest_error_neighbor = np.argmax(neighbors[:, -1], axis=0)
+            
+            p1 = self.g.vp.pos[highest_error_node]
+            p2 = self.g.vp.pos[highest_error_neighbor]
+
+            u1 = self.g.vp.utility[highest_error_node]
+            u2 = self.g.vp.utility[highest_error_neighbor]
+            
+            v = self.g.add_vertex()
+            self.g.vp.error[v] = self.g.vp.error[highest_error_node]
+            self.g.vp.utility[v] = (u1+u2) * 0.5
+            self.g.vp.pos[v] = (np.array(p1) + np.array(p2))*0.5
+
+            self.g.add_edge_list([  [v, highest_error_node], 
+                                    [v, highest_error_neighbor]])
+            
+            self.g.vp.error[highest_error_node] *= self.a
+            self.g.vp.error[highest_error_neighbor] *= self.a
+            
+    def _discount(self):
+        '''
+        Discount error and utility
+        '''
+        self.g.ep.error.a *= self.b
+        self.g.ep.utility.a *= self.b
+
+    def fit(self, s):
+        winner, second = self._update_winner(s)
+        if winner is None:
+            return
+
+        self._adapt_neighborhood(winner, second, s)
+        self._prune_edges()
+        highest_error_node = self._prune_nodes()
+        self._add_node(highest_error_node)
+        self._discount()
+
+                
+
