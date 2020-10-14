@@ -1,7 +1,7 @@
-from graph_tool.all import *
+import graph_tool.all as gt
 import numpy as np
 
-class GNGU():
+class GrowingNeuralGas():
     '''
     Growing Neural Gas with Utility implementation 
     from Fritzke, 1997
@@ -22,11 +22,13 @@ class GNGU():
         k (float): Utility removal sensitiveness, lower = frequent deletions, for stability k has to be a little higher than the mean U/error ratio
         max_nodes (int): Maximum number of nodes allowed in the GNG
         max_age (int): Maximum age an edge can reach before removal
+
+    @author: Nassim Habbash
     '''
 
     def __init__(self, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
         
-        self.g = Graph(directed=False)
+        self.g = gt.Graph(directed=False)
         self.e_w = e_w
         self.e_n = e_n
         self.l = l
@@ -121,10 +123,11 @@ class GNGU():
         all_edges = self.g.get_edges(eprops=[self.g.ep.age, self.g.edge_index])
 
         mask = all_edges[:, -2] >= self.max_age
-        old_edges = all_edges[mask, -1]
+        old_edges = all_edges[mask]
 
         for e in old_edges:
-            self.g.remove_edge(e)
+            edge = self.g.edge(e[0], e[1])
+            self.g.remove_edge(edge)
 
     def _prune_nodes(self):
         '''
