@@ -216,6 +216,7 @@ class GrowingNeuralGas():
             self.stats()
 
     def stats(self, slow=True):
+        # TODO: Error tracking
         if self.i%100!=0 and slow:
             return
 
@@ -223,3 +224,5 @@ class GrowingNeuralGas():
         print("Graph properties: ")
         print(self.g)
     
+    def n_clusters(self):
+        pass
