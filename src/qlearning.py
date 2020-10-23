@@ -56,14 +56,14 @@ class QLearning():
     def set_debug(self, flag=True):
         self.debug = flag
 
-    def update(self, state, next_state, action, reward):
+    def update(self, state, next_state, best_action, reward):
         '''
         Q table update
         '''
         best_next_action = np.argmax(self.Q[next_state]) 
         td_target = reward + self.discount_factor * self.Q[next_state][best_next_action]
-        td_error = td_target - self.Q[state][action]
-        self.Q[state][action] = self.Q[state][action] + self.alpha * td_error
+        td_error = td_target - self.Q[state][best_action]
+        self.Q[state][best_action] = (1 - self.alpha) * self.Q[state][best_action] + self.alpha * td_error
 
     def step_train(self, state, env):
         '''
@@ -73,16 +73,12 @@ class QLearning():
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
         next_state, reward, done, _ = env.step(action)
 
-        # Next action
-        next_action_probs = self.policy(next_state)
-        next_action = np.random.choice(np.arange(len(next_action_probs)), p=next_action_probs)
-
         # Update statistics
         #stats.episode_rewards[i_episode] += reward
         #tats.episode_lengths[i_episode] = step
 
         # TD update
-        best_next_action = np.argmax(Q[next_state]) 
+        best_next_action = np.argmax(self.Q[next_state]) 
         td_target = reward + self.discount_factor * self.Q[next_state][best_next_action]
         td_error = td_target - self.Q[state][action]
         self.Q[state][action] = self.Q[state][action] + self.alpha * td_error
@@ -107,10 +103,6 @@ class QLearning():
                 action_probs = self.policy(state)
                 action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
                 next_state, reward, done, _ = env.step(action)
-
-                # Next action
-                next_action_probs = self.policy(next_state)
-                next_action = np.random.choice(np.arange(len(next_action_probs)), p=next_action_probs)
 
                 # Update statistics
                 #stats.episode_rewards[i_episode] += reward

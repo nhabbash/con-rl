@@ -13,6 +13,7 @@ class GrowingNeuralGas():
         4. Add
 
     Attributes:
+        ndim (int): State space dimensionality
         e_w (float): Fraction of distance to move the winner node towards the current signal
         e_n (float): Fraction of distance to move the neighbors of the winner node towards the current signal
         i (int): Current number of iterations
@@ -22,13 +23,15 @@ class GrowingNeuralGas():
         k (float): Utility removal sensitiveness, lower = frequent deletions, for stability k has to be a little higher than the mean U/error ratio
         max_nodes (int): Maximum number of nodes allowed in the GNG
         max_age (int): Maximum age an edge can reach before removal
+        initialized (bool): is True when GNG has at least two nodes 
 
     @author: Nassim Habbash
     '''
 
-    def __init__(self, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
+    def __init__(self, ndim, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
         
         self.g = gt.Graph(directed=False)
+        self.ndim = ndim
         self.e_w = e_w
         self.e_n = e_n
         self.l = l
@@ -38,6 +41,7 @@ class GrowingNeuralGas():
         self.max_nodes = max_nodes
         self.max_age = max_age
         self.i = 0
+        self.initialized = False
 
         # Property maps for graph and edge variables
         self.g.ep.age = self.g.new_edge_property("int")
@@ -49,7 +53,7 @@ class GrowingNeuralGas():
         # graph-tools properties
         self.g.set_fast_edge_removal(fast=True)
     
-    def set_parameters(self, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
+    def set_parameters(self, ndim, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
         self.e_w = e_w
         self.e_n = e_n
         self.l = l
@@ -58,20 +62,27 @@ class GrowingNeuralGas():
         self.k = k
         self.max_nodes = max_nodes
         self.max_age = max_age
+        self.ndim = ndim
 
     def _nearest_neighbors(self, s):
         '''
         Return the two closest nodes to s and updates error
         '''
-        all_pos = self.g.vp.pos.get_2d_array([0, 1])
 
-        # Squared distance
-        distances = np.sum((all_pos.T - s) ** 2, axis=1)
-        winner, second, *_ = np.argpartition(distances, 1) 
-        # TODO: check if kDTree search is faster than np.argpartition 
+        winner = second = error_w = error_s = None
+        if len(self.g.get_vertices()) >= 2:
+            all_pos = self.g.vp.pos.get_2d_array(np.arange(self.ndim))
+            # Squared distance
+            s_col = s.reshape(-1, 1)
+            distances = np.sum((all_pos - s_col) ** 2, axis=0)
+            # print(all_pos)
+            # print(s_col)
+            # print(distances)
+            winner, second, *_ = np.argpartition(distances, 1) 
+            # TODO: check if kDTree search is faster than np.argpartition 
 
-        error_w = distances[winner]
-        error_s = distances[second]
+            error_w = distances[winner]
+            error_s = distances[second]
 
         return winner, second, error_w, error_s
 
@@ -101,7 +112,7 @@ class GrowingNeuralGas():
         neighbors = self.g.get_all_neighbors(winner)
 
         if neighbors.size > 0:
-            all_pos = self.g.vp.pos.get_2d_array([0, 1])
+            all_pos = self.g.vp.pos.get_2d_array(np.arange(self.ndim))
 
             # Move winner's neighbors
             s_col = s.reshape(-1, 1)
@@ -160,6 +171,7 @@ class GrowingNeuralGas():
         # TODO: error-based insertion rate (ie when mean squared error is larger than a threshold add node)
 
         if self.i % self.l == 0 and len(self.g.get_vertices()) != self.max_nodes:
+            # print(highest_error_node)
             neighbors = self.g.get_all_neighbors(highest_error_node, vprops=[self.g.vp.error])
 
             if neighbors.size > 0:
@@ -173,8 +185,8 @@ class GrowingNeuralGas():
                 
                 v = self.g.add_vertex()
                 self.g.vp.error[v] = self.g.vp.error[highest_error_node]
-                self.g.vp.utility[v] = (u1+u2) * 0.5
-                self.g.vp.pos[v] = (np.array(p1) + np.array(p2))*0.5
+                self.g.vp.utility[v] = (u1+u2)*0.5
+                self.g.vp.pos[v] = (np.array(p1)+np.array(p2))*0.5
 
                 self.g.add_edge_list([  [v, highest_error_node], 
                                         [v, highest_error_neighbor]])
@@ -199,7 +211,6 @@ class GrowingNeuralGas():
         self.g.vp.pos[v] = s
     
     def fit(self, s, debug=False):
-
         if len(self.g.get_vertices()) < 2:
             self._add_init_node(s)
         else:
@@ -211,6 +222,7 @@ class GrowingNeuralGas():
             self._discount()
 
         self.i+=1
+        self.initialized = False if len(self.g.get_vertices()) < 2 else True
 
         if debug:
             self.stats()

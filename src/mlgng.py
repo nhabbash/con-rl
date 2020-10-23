@@ -1,4 +1,4 @@
-from gngu import GrowingNeuralGas
+from .gngu import GrowingNeuralGas
 import numpy as np
 from collections import defaultdict
 
@@ -9,16 +9,23 @@ class MultiLayerGrowingNeuralGas():
 
     Attributes:
         m (int): Number of layers
+        ndim (int): State space dimensionality
         layers (dict): Dictionary of GrowingNeuralGas classes
 
     @author: Nassim Habbash
     '''
 
-    def __init__(self, m):
+    def __init__(self, m, ndim):
         self.m = m
         self.layers = defaultdict()
         for i in range(m):
-            self.layers[i] = GrowingNeuralGas()
+            self.layers[i] = GrowingNeuralGas(ndim=ndim)
+
+    def __getitem__(self, key):
+        return self.layers[key]
+
+    def __setitem__(self, key, value):
+        self.layers[key] = value
     
     def set_layers_parameters(self, params, m=-1):
         '''
@@ -35,6 +42,13 @@ class MultiLayerGrowingNeuralGas():
         else:
             self.layers[m].set_parameters(**params)
 
+    def _format_state(self, s):
+
+        if not isinstance(s, np.ndarray):
+            s = np.ravel(np.array([s]))
+
+        return s
+
     def update(self, s, m):
         '''
         Updates the m-th layer with the state s
@@ -43,24 +57,22 @@ class MultiLayerGrowingNeuralGas():
             s (tuple): Sampled state
             m (int): Layer
         '''
+        s = self._format_state(s)
         self.layers[m].fit(s)
 
     def policy(self, s):
         '''
-        Returns the best action given a state s.
+        Returns the top_k best actions given a state s.
         The best action is given by the GNG layer containing the closest node to s.
 
         Parameters:
             s (tuple): Sampled state
         '''
-        
-        best_action = None
-        distance = np.inf
+        s = self._format_state(s)
 
+        A = np.empty(self.m)
         for i in range(self.m):
             _, _, error_w, _ = self.layers[i]._nearest_neighbors(s)
-            if distance >= error_w:
-                distance = error_w
-                best_action = i
-        
-        return best_action
+            A[i] = np.inf if error_w == None else error_w
+
+        return A

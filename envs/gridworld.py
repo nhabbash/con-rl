@@ -84,7 +84,7 @@ class GridworldEnv(discrete.DiscreteEnv):
 
     def render(self, mode='human', close=False):
         """ Renders the current gridworld layout
-         For example, a 4x4 grid with the mode="human" looks like:
+        For example, a 4x4 grid with the mode="human" looks like:
             T  o  o  o
             o  x  o  o
             o  o  o  o
