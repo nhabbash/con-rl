@@ -105,6 +105,7 @@ class GrowingNeuralGas():
         '''
         Move the winner node and its topological neighbors towards s, add an edge between the two winner nodes
         '''
+
         # Adapt winner's position
         self.g.vp.pos[winner] += self.e_w*(s-self.g.vp.pos[winner])
     
@@ -227,12 +228,12 @@ class GrowingNeuralGas():
         if debug:
             self.stats()
 
-    def stats(self, slow=True):
+    def stats(self, full=False):
         # TODO: Error tracking
-        if self.i%100!=0 and slow:
+        if self.i%100!=0 and full:
             return
 
-        print("Iteration: ", self.i)
+        print("Iterations: ", self.i)
         print("Graph properties: ")
         print(self.g)
     

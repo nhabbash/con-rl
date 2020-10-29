@@ -1,4 +1,5 @@
 from collections import namedtuple
 
 EpisodeStats = namedtuple("Stats", ["episode_lengths", 
-                                    "episode_rewards"])
+                                    "episode_rewards",
+                                    "selector_dist"])

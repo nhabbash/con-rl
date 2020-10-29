@@ -43,7 +43,7 @@ class MultiLayerGrowingNeuralGas():
             self.layers[m].set_parameters(**params)
 
     def _format_state(self, s):
-
+        
         if not isinstance(s, np.ndarray):
             s = np.ravel(np.array([s]))
 
@@ -76,3 +76,8 @@ class MultiLayerGrowingNeuralGas():
             A[i] = np.inf if error_w == None else error_w
 
         return A
+
+    def stats(self):
+        for i in range(self.m):
+            print("> Layer: ", i)
+            self.layers[i].stats()

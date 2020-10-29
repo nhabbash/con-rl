@@ -1,5 +1,5 @@
 from .mlgng import MultiLayerGrowingNeuralGas
-from .qlearning import QLearning
+from .qlearning import QLearningAgent
 from collections import defaultdict
 
 import numpy as np
@@ -18,11 +18,15 @@ class ConRL():
     @author: Nassim Habbash
     '''
 
-    def __init__(self, num_actions, ndim, update_threshold = 20):
-        self.num_actions = num_actions
-        self.support = QLearning(num_actions=num_actions)
-        self.mlgng = MultiLayerGrowingNeuralGas(m=num_actions, ndim=ndim)
-        self.action_counter = defaultdict(lambda: np.zeros(num_actions))
+    def __init__(self, action_size, ndim, state_grid, update_threshold = 20):
+        self.action_size = action_size
+        self.support = QLearningAgent(action_size=action_size, state_grid=state_grid)
+        self.mlgng = MultiLayerGrowingNeuralGas(m=action_size, ndim=ndim)
+
+        self.state_grid = state_grid
+        self.state_size = tuple(len(dim) + 1 for dim in state_grid)
+        shape = self.state_size + (self.action_size, )
+        self.action_counter = np.zeros(shape=shape)
         self.update_threshold = update_threshold
 
     def _simple_action_selector(self, state):
@@ -34,8 +38,7 @@ class ConRL():
         '''
 
         # QL action - choose the action with the highest Q value with epsilon probability to explore
-        action_probs = self.support.policy(state)
-        q_best_action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+        q_best_action = self.support.policy(state)
 
         # MLGNG action - choose the action layer with the closest state
         action_distances = self.mlgng.policy(state)
@@ -48,10 +51,10 @@ class ConRL():
         selected = None
         if mlgng_best_action is None:
             best_action = q_best_action
-            selected = "Support"
+            selected = 0 # Support
         else: 
             best_action = mlgng_best_action
-            selected = "MLGNG"
+            selected = 1 # MLGNG
 
         return best_action, mlgng_best_action, q_best_action, selected
 
@@ -63,7 +66,7 @@ class ConRL():
         # Consecutive action counter update
         # If the counter for an incoming (state, action) pair is 0, reset the counter for all state's actions to start a new consecutive count
         if self.action_counter[state][support_best_action] == 0:
-            self.action_counter[state] = np.zeros(self.num_actions)
+            self.action_counter[state] = 0
         
         self.action_counter[state][support_best_action] += 1
 
@@ -71,7 +74,7 @@ class ConRL():
         if self.action_counter[state][support_best_action] >= self.update_threshold:
             self.mlgng.update(state, support_best_action)
 
-    def step(self, state, env):
+    def step(self, state, env, discretize=None):
         '''
         Executes a step and updates the two agents
 
@@ -81,9 +84,14 @@ class ConRL():
         '''
 
         # TODO: discretization of s
+        if discretize:
+            state = discretize(state, self.state_grid)
 
         best_action, _, support_best_action, selected = self._simple_action_selector(state)
         next_state, reward, done, _ = env.step(best_action)
+        
+        if discretize:
+            next_state = discretize(next_state, self.state_grid)
 
         # Supporting agent update
         self.support.update(state, next_state, best_action, reward)

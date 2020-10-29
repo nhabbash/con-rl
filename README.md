@@ -9,6 +9,12 @@
 # Prerequisites
 * Conda or Virtualenv
 
+# Requirements
+* Graph-Tool
+* NumPy
+* OpenAI Gym
+* Matplotlib
+
 ## Installation
 ```sh
 $ git clone https://github.com/nhabbash/con-rl
