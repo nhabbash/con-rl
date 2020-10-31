@@ -1,4 +1,4 @@
-import graph_tool.all as gt
+from graph_tool import Graph
 import numpy as np
 
 class GrowingNeuralGas():
@@ -30,7 +30,7 @@ class GrowingNeuralGas():
 
     def __init__(self, ndim, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
         
-        self.g = gt.Graph(directed=False)
+        self.g = Graph(directed=False)
         self.ndim = ndim
         self.e_w = e_w
         self.e_n = e_n

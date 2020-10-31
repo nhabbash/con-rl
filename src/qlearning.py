@@ -1,11 +1,6 @@
 import numpy as np
 import sys
 import itertools
-from collections import defaultdict
-
-def discretize(sample, grid):
-    coords = [int(np.digitize(sample[i], grid[i])) for i, _ in enumerate(grid)]
-    return tuple(coords)
 
 class QLearningAgent:
     '''
@@ -14,34 +9,37 @@ class QLearningAgent:
 
     Attributes:
         action_size: Number of actions allowed in the environment.
-        num_episodes: Number of episodes to run for.
+        state_size: State space discretization
         gamma: Discount factor.
         alpha: TD learning rate.
+        alpha_decay_rate
+        min_alpha
         epsilon: Chance to sample a random action. Float between 0 and 1.
         epsilon_decay_rate TODO
         min_epsilon TODO
-        state_grid: State space discretization
     '''
 
-    def __init__(self, action_size, state_grid, gamma=0.9, alpha=0.1, epsilon=0.1, epsilon_decay_rate=1, min_epsilon=0.01, seed=42):
+    def __init__(self, 
+    action_size, 
+    state_size, 
+    **kargs):
         
-        self.state_grid = state_grid
-        self.state_size = tuple(len(dim) + 1 for dim in state_grid)
+        self.state_size = state_size
         self.action_size = action_size
-        self.seed = np.random.seed(seed)
+        self.actions = np.arange(self.action_size)
 
         # Parameters
-        self.gamma = gamma
-        self.alpha = alpha
-        self.epsilon = self.initial_epsilon = epsilon
-        self.epsilon_decay_rate = epsilon_decay_rate
-        self.min_epsilon = min_epsilon
-
-        # Q Table
+        self.gamma = kargs["gamma"]
+        self.alpha = kargs["alpha"]
+        self.min_alpha = kargs["min_alpha"]
+        self.alpha_decay_rate = kargs["alpha_decay_rate"]
+        self.epsilon = self.initial_epsilon = kargs["epsilon"]
+        self.epsilon_decay_rate = kargs["epsilon_decay_rate"]
+        self.min_epsilon = kargs["min_epsilon"]
+        
+        # Q Table, initialized with random Q values between -2 and 0
         shape = self.state_size + (self.action_size, )
-        self.Q = np.zeros(shape=shape)
-        # A nested dictionary that maps state -> (action -> action-value).
-        #self.Q_old = defaultdict(lambda: np.zeros(action_size))
+        self.Q  = np.random.uniform(low=-2, high=0, size=shape)
 
         # Misc
         self.debug = False
@@ -51,37 +49,53 @@ class QLearningAgent:
         Epsilon greedy action selection
         '''
 
-        if len(set(self.Q[state])) == 1:
-            A = np.ones(self.action_size, dtype=float) / self.action_size
-        else:
-            A = np.ones(self.action_size, dtype=float) * self.epsilon / self.action_size
-            best_action = np.argmax(self.Q[state])
-            A[best_action] += (1.0 - self.epsilon)
+        # if len(set(self.Q[state])) == 1:
+        #     A = np.ones(self.action_size, dtype=float) / self.action_size
+        # else:
+        #     A = np.ones(self.action_size, dtype=float) * self.epsilon / self.action_size
+        #     best_action = np.argmax(self.Q[state])
+        #     A[best_action] += (1.0 - self.epsilon)
 
-        chosen_action = np.random.choice(np.arange(len(A)), p=A)
+        if np.random.random() < self.epsilon:
+            chosen_action = np.random.choice(self.actions)
+        else:
+            # No tie-breaking
+            # chosen_action = np.argmax(self.Q[state]) # No tie-breaking
+            
+            # Q-values to probabilities
+            # logits = self.Q[state]
+            # logits_exp = np.exp(logits)
+            # probabilities = logits_exp / np.sum(logits_exp)
+            # chosen_action = np.random.choice(self.actions, p=probabilities)
+
+            # Tie-breaking
+            values = self.Q[state]
+            chosen_action = np.random.choice(np.flatnonzero(values == values.max()))
         return chosen_action
 
     def set_debug(self, flag=True):
         self.debug = flag
 
-    def decay_epsilon(self):
-        self.epsilon *= self.epsilon_decay_rate
+    def decay_epsilon(self, i=None):
+        self.epsilon -= self.epsilon_decay_rate
+        #self.epsilon = self.epsilon*self.epsilon_decay_rate
+        #self.epsilon = np.exp(-self.epsilon_decay_rate*i)
         self.epsilon = max(self.epsilon, self.min_epsilon)
+
+    def decay_alpha(self, i=None):
+        self.alpha -= self.alpha_decay_rate
+        self.alpha = max(self.alpha, self.min_alpha)
 
     def update(self, state, next_state, best_action, reward):
         '''
         Q table update
         '''
+
         t = state + (best_action, )
         qs = self.Q[next_state]
-        td_target = reward + self.gamma * max(qs)
+        td_target = reward + self.gamma * qs.max()
         td_error = td_target - self.Q[t]
         self.Q[t] += self.alpha * td_error
-
-        # best_next_action = np.argmax(self.Q[next_state]) 
-        # td_target = reward + self.gamma * self.Q[next_state][best_next_action]
-        # td_error = td_target - self.Q[state][best_action]
-        # self.Q[state][best_action] = self.Q[state][best_action] + self.alpha * td_error
 
     def decide(self, state, env):
         '''
@@ -89,11 +103,9 @@ class QLearningAgent:
         '''
         action = self.policy(state)
         next_state, reward, done, _ = env.step(action)
-
-        # TD update
         self.update(state, next_state, action, reward)
-
         state = next_state
+
         return next_state, done
 
     def train(self, env, num_episodes):

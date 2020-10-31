@@ -1,4 +1,4 @@
-name: /home/nassim/dev/conrl/.conda-env
+name: ./.conda-env
 channels:
   - defaults
   - conda-forge
@@ -159,4 +159,4 @@ dependencies:
     - future==0.18.2
     - gym==0.17.3
     - pyglet==1.5.0
-prefix: /home/nassim/dev/conrl/.conda-env
+prefix: ./.conda-env

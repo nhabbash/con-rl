@@ -83,7 +83,6 @@ class ConRL():
             env (OpenAI gym): Environment
         '''
 
-        # TODO: discretization of s
         if discretize:
             state = discretize(state, self.state_grid)
 
@@ -94,6 +93,7 @@ class ConRL():
             next_state = discretize(next_state, self.state_grid)
 
         # Supporting agent update
+        state = (state, ) #TODO TMP FIX!!
         self.support.update(state, next_state, best_action, reward)
 
         # MLGNG agent update
