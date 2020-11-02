@@ -22,20 +22,22 @@ class QLearningAgent:
     def __init__(self, 
     action_size, 
     state_size, 
-    **kargs):
+    **kwargs):
         
         self.state_size = state_size
         self.action_size = action_size
         self.actions = np.arange(self.action_size)
 
         # Parameters
-        self.gamma = kargs["gamma"]
-        self.alpha = kargs["alpha"]
-        self.min_alpha = kargs["min_alpha"]
-        self.alpha_decay_rate = kargs["alpha_decay_rate"]
-        self.epsilon = self.initial_epsilon = kargs["epsilon"]
-        self.epsilon_decay_rate = kargs["epsilon_decay_rate"]
-        self.min_epsilon = kargs["min_epsilon"]
+
+        if kwargs:
+            self.gamma = kwargs["gamma"]
+            self.alpha = kwargs["alpha"]
+            self.min_alpha = kwargs["min_alpha"]
+            self.alpha_decay_rate = kwargs["alpha_decay_rate"]
+            self.epsilon = self.initial_epsilon = kwargs["epsilon"]
+            self.epsilon_decay_rate = kwargs["epsilon_decay_rate"]
+            self.min_epsilon = kwargs["min_epsilon"]
         
         # Q Table, initialized with random Q values between -2 and 0
         shape = self.state_size + (self.action_size, )
@@ -43,6 +45,15 @@ class QLearningAgent:
 
         # Misc
         self.debug = False
+
+    def set_parameters(self, **kwargs):
+            self.gamma = kwargs["gamma"]
+            self.alpha = kwargs["alpha"]
+            self.min_alpha = kwargs["min_alpha"]
+            self.alpha_decay_rate = kwargs["alpha_decay_rate"]
+            self.epsilon = self.initial_epsilon = kwargs["epsilon"]
+            self.epsilon_decay_rate = kwargs["epsilon_decay_rate"]
+            self.min_epsilon = kwargs["min_epsilon"]
 
     def policy(self, state):
         '''
@@ -59,16 +70,13 @@ class QLearningAgent:
         if np.random.random() < self.epsilon:
             chosen_action = np.random.choice(self.actions)
         else:
-            # No tie-breaking
-            # chosen_action = np.argmax(self.Q[state]) # No tie-breaking
-            
             # Q-values to probabilities
             # logits = self.Q[state]
             # logits_exp = np.exp(logits)
             # probabilities = logits_exp / np.sum(logits_exp)
             # chosen_action = np.random.choice(self.actions, p=probabilities)
 
-            # Tie-breaking
+            # Random tie-breaking
             values = self.Q[state]
             chosen_action = np.random.choice(np.flatnonzero(values == values.max()))
         return chosen_action

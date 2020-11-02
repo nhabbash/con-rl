@@ -1,7 +1,5 @@
 from .mlgng import MultiLayerGrowingNeuralGas
 from .qlearning import QLearningAgent
-from collections import defaultdict
-
 import numpy as np
 
 class ConRL():
@@ -18,16 +16,20 @@ class ConRL():
     @author: Nassim Habbash
     '''
 
-    def __init__(self, action_size, ndim, state_grid, update_threshold = 20):
+    def __init__(self, action_size, state_size, update_threshold = 20):
         self.action_size = action_size
-        self.support = QLearningAgent(action_size=action_size, state_grid=state_grid)
-        self.mlgng = MultiLayerGrowingNeuralGas(m=action_size, ndim=ndim)
+        self.state_size = state_size
 
-        self.state_grid = state_grid
-        self.state_size = tuple(len(dim) + 1 for dim in state_grid)
-        shape = self.state_size + (self.action_size, )
+        shape = state_size + (self.action_size, )
         self.action_counter = np.zeros(shape=shape)
         self.update_threshold = update_threshold
+
+    def init_support(self, **params):
+        self.support = QLearningAgent(action_size=self.action_size, state_size=self.state_size, **params)
+
+    def init_mlgng(self, **params):
+        self.mlgng = MultiLayerGrowingNeuralGas(m=self.action_size, ndim=params["ndim"])
+        self.mlgng.set_layers_parameters(params, m=-1)
 
     def _simple_action_selector(self, state):
         '''
@@ -41,11 +43,7 @@ class ConRL():
         q_best_action = self.support.policy(state)
 
         # MLGNG action - choose the action layer with the closest state
-        action_distances = self.mlgng.policy(state)
-        # If all action distances are np.inf then there is no initialized layer in MLGNG
-        mlgng_best_action = None
-        if not np.all(action_distances == np.inf):
-            mlgng_best_action = np.argmin(action_distances)
+        mlgng_best_action = self.mlgng.policy(state)
 
         best_action = None
         selected = None

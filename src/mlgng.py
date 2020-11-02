@@ -42,6 +42,10 @@ class MultiLayerGrowingNeuralGas():
         else:
             self.layers[m].set_parameters(**params)
 
+    def update_rate(self, rate):
+        for i in range(self.m):
+            self.layers[i].rate = rate
+
     def _format_state(self, s):
         
         if not isinstance(s, np.ndarray):
@@ -62,7 +66,7 @@ class MultiLayerGrowingNeuralGas():
 
     def policy(self, s):
         '''
-        Returns the top_k best actions given a state s.
+        Returns the best actions given a state s.
         The best action is given by the GNG layer containing the closest node to s.
 
         Parameters:
@@ -73,9 +77,13 @@ class MultiLayerGrowingNeuralGas():
         A = np.empty(self.m)
         for i in range(self.m):
             _, _, error_w, _ = self.layers[i]._nearest_neighbors(s)
-            A[i] = np.inf if error_w == None else error_w
+            A[i] = error_w
+        
+        best_action = np.argmin(A)
+        if A[best_action] == np.inf:
+            best_action = None
 
-        return A
+        return best_action
 
     def stats(self):
         for i in range(self.m):
