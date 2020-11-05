@@ -55,7 +55,7 @@ class ConRL():
             selected = 1 # MLGNG
 
         return best_action, mlgng_best_action, q_best_action, selected
-
+        
     def mlgng_update_strategy(self, state, support_best_action):
         '''
         MLGNG is updated only after a state reaches a threshold of consecutive actions from the supporting agent
@@ -70,9 +70,11 @@ class ConRL():
 
         # MLGNG Agent update
         if self.action_counter[state][support_best_action] >= self.update_threshold:
+            self.mlgng.update_discount_rate(self.support.epsilon) # TODO remove dependance from support
             self.mlgng.update(state, support_best_action)
 
-    def step(self, state, env, discretize=None):
+
+    def step(self, state, env, window_size=None, discretize=None):
         '''
         Executes a step and updates the two agents
 
@@ -80,18 +82,16 @@ class ConRL():
             state (tuple): Sampled state
             env (OpenAI gym): Environment
         '''
-
-        if discretize:
-            state = discretize(state, self.state_grid)
-
         best_action, _, support_best_action, selected = self._simple_action_selector(state)
-        next_state, reward, done, _ = env.step(best_action)
+        next_obs, reward, done, _ = env.step(best_action)
         
         if discretize:
-            next_state = discretize(next_state, self.state_grid)
+            next_state = discretize(next_obs, window_size, env)
+        else:
+            next_state = next_obs
 
         # Supporting agent update
-        state = (state, ) #TODO TMP FIX!!
+        #state = (state, ) #TODO TMP FIX for 1d env!!
         self.support.update(state, next_state, best_action, reward)
 
         # MLGNG agent update

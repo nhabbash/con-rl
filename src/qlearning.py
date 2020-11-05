@@ -20,14 +20,14 @@ class QLearningAgent:
     '''
 
     def __init__(self, 
-    action_size, 
-    state_size, 
-    **kwargs):
+                action_size, 
+                state_size, 
+                **kwargs):
         
         self.state_size = state_size
         self.action_size = action_size
         self.actions = np.arange(self.action_size)
-
+        self.exploitation = False
         # Parameters
 
         if kwargs:
@@ -67,7 +67,7 @@ class QLearningAgent:
         #     best_action = np.argmax(self.Q[state])
         #     A[best_action] += (1.0 - self.epsilon)
 
-        if np.random.random() < self.epsilon:
+        if np.random.random() < self.epsilon and not self.exploitation:
             chosen_action = np.random.choice(self.actions)
         else:
             # Q-values to probabilities

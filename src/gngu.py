@@ -14,7 +14,7 @@ class GrowingNeuralGas():
 
     Attributes:
         ndim (int): State space dimensionality
-        rate (float): Rate by which discounts are applied
+        discount_rate (float): Rate by which discounts are applied
         e_w (float): Fraction of distance to move the winner node towards the current signal
         e_n (float): Fraction of distance to move the neighbors of the winner node towards the current signal
         i (int): Current number of iterations
@@ -29,7 +29,7 @@ class GrowingNeuralGas():
     @author: Nassim Habbash
     '''
 
-    def __init__(self, ndim, rate=1, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
+    def __init__(self, ndim, discount_rate=1, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
         
         self.g = Graph(directed=False)
         self.ndim = ndim
@@ -39,7 +39,7 @@ class GrowingNeuralGas():
         self.a = a 
         self.b = b
         self.k = k
-        self.rate = rate
+        self.discount_rate = discount_rate
         self.max_nodes = max_nodes
         self.max_age = max_age
         self.i = 0
@@ -55,20 +55,20 @@ class GrowingNeuralGas():
         # graph-tools properties
         self.g.set_fast_edge_removal(fast=True)
     
-    def set_parameters(self, ndim, rate=1, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
+    def set_parameters(self, ndim, discount_rate=1, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
         self.e_w = e_w
         self.e_n = e_n
         self.l = l
         self.a = a 
         self.b = b
         self.k = k
-        self.rate = rate
+        self.discount_rate = discount_rate
         self.max_nodes = max_nodes
         self.max_age = max_age
         self.ndim = ndim
 
-    def update_rate(self, rate):
-        self.rate = rate
+    def update_discount_rate(self, discount_rate):
+        self.discount_rate = discount_rate
 
     def _nearest_neighbors(self, s):
         '''
@@ -83,9 +83,6 @@ class GrowingNeuralGas():
             # Squared distance
             s_col = s.reshape(-1, 1)
             distances = np.sum((all_pos - s_col) ** 2, axis=0)
-            # print(all_pos)
-            # print(s_col)
-            # print(distances)
             winner, second, *_ = np.argpartition(distances, 1) 
             # TODO: check if kDTree search is faster than np.argpartition 
 
@@ -115,7 +112,7 @@ class GrowingNeuralGas():
         '''
 
         # Adapt winner's position
-        self.g.vp.pos[winner] += self.e_w*self.rate*(s-self.g.vp.pos[winner])
+        self.g.vp.pos[winner] += self.e_w*self.discount_rate*(s-self.g.vp.pos[winner])
     
         # Adapt neighbors if they exist
         neighbors = self.g.get_all_neighbors(winner)
@@ -125,7 +122,7 @@ class GrowingNeuralGas():
 
             # Move winner's neighbors
             s_col = s.reshape(-1, 1)
-            all_pos[:, neighbors] += self.e_n*self.rate*(s_col-all_pos[:, neighbors])
+            all_pos[:, neighbors] += self.e_n*self.discount_rate*(s_col-all_pos[:, neighbors])
             self.g.vp.pos.set_2d_array(all_pos)
 
         # Connect the winner nodes and resets the edge age to 0

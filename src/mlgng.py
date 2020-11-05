@@ -42,10 +42,13 @@ class MultiLayerGrowingNeuralGas():
         else:
             self.layers[m].set_parameters(**params)
 
-    def update_rate(self, rate):
-        for i in range(self.m):
-            self.layers[i].rate = rate
-
+    def update_discount_rate(self, discount_rate, m=-1):
+        if m == -1:
+            for i in range(self.m):
+                self.layers[i].discount_rate = discount_rate
+        else:
+                self.layers[m].discount_rate = discount_rate
+                
     def _format_state(self, s):
         
         if not isinstance(s, np.ndarray):
@@ -85,7 +88,16 @@ class MultiLayerGrowingNeuralGas():
 
         return best_action
 
-    def stats(self):
-        for i in range(self.m):
-            print("> Layer: ", i)
-            self.layers[i].stats()
+    def stats(self, one_line=False):
+        if one_line:
+            nodes = []
+            edges = []
+            for i in range(self.m):
+                nodes.append(str(len(self.layers[i].g.get_vertices())))
+                edges.append(str(len(self.layers[i].g.get_edges())))
+            
+            print("\t MLGNG nodes per action layer: "+" ".join(nodes))
+        else:
+            for i in range(self.m):
+                print("> Layer: ", i)
+                self.layers[i].stats()
