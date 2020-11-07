@@ -1,5 +1,12 @@
 from graph_tool import Graph
 import numpy as np
+from collections import namedtuple
+
+GNGStats = namedtuple("GNGStats", ["global_error",
+                                    "global_utility",
+                                    "graph_order", # |V|
+                                    "graph_size", # |E|
+                                    ]) 
 
 class GrowingNeuralGas():
     '''
@@ -45,6 +52,12 @@ class GrowingNeuralGas():
         self.i = 0
         self.initialized = False
 
+        self.stats = GNGStats(
+                    global_error=[],
+                    global_utility=[],
+                    graph_order=[],
+                    graph_size=[])
+
         # Property maps for graph and edge variables
         self.g.ep.age = self.g.new_edge_property("int")
         self.g.vp.utility = self.g.new_vertex_property("float")
@@ -83,8 +96,7 @@ class GrowingNeuralGas():
             # Squared distance
             s_col = s.reshape(-1, 1)
             distances = np.sum((all_pos - s_col) ** 2, axis=0)
-            winner, second, *_ = np.argpartition(distances, 1) 
-            # TODO: check if kDTree search is faster than np.argpartition 
+            winner, second, *_ = np.argpartition(distances, 1)
 
             error_w = distances[winner]
             error_s = distances[second]
@@ -230,17 +242,22 @@ class GrowingNeuralGas():
         self.i+=1
         self.initialized = False if len(self.g.get_vertices()) < 2 else True
 
+        # Stats
+        self.stats.global_error.append(np.sum(self.g.vp.error.get_array()))
+        self.stats.global_utility.append(np.sum(self.g.vp.utility.get_array()))
+        self.stats.graph_order.append(len(self.g.get_vertices()))
+        self.stats.graph_size.append(len(self.g.get_edges()))
         if debug:
-            self.stats()
+            #TODO: send data to graph here
+            self.print_stats()
 
-    def stats(self, full=False):
+    def print_stats(self, full=False):
         # TODO: Error tracking
         if self.i%100!=0 and full:
             return
 
         print("Iterations: ", self.i)
         print("Graph properties: ")
-        print(self.g)
-    
-    def n_clusters(self):
-        pass
+        print("\t Order: {}".format(self.stats.graph_order[self.i]))
+        print("\t Size: {}".format(self.stats.graph_size[self.i]))
+        print("\t Global error: {}".format(self.stats.global_error[self.i]))

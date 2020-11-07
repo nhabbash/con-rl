@@ -1,20 +1,100 @@
-from collections import namedtuple, defaultdict
-import itertools
+from collections import namedtuple
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.collections as mc
+from matplotlib.collections import LineCollection
 import mpl_toolkits.mplot3d.art3d as art3d
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.patches import Rectangle, PathPatch
+from matplotlib.patches import Rectangle
 from matplotlib import cm
 from matplotlib.colors import Normalize
 import seaborn as sns
 
 
-EpisodeStats = namedtuple("Stats", ["episode_lengths", 
+EpisodeStats = namedtuple("EpisodeStats", ["episode_lengths", 
                                     "episode_rewards",
                                     "selector_dist"])
+
+def plot_gng_stats(stats, rolling_window=10, smoothed=False, colors=cm.Dark2(np.linspace(0, 1, 4, endpoint=False)), def_ax=None):
+    
+    if not def_ax:
+        fig, ax = plt.subplots(nrows=3, figsize=(10, 9))
+        ax = ax.flatten()
+    else:
+        ax = def_ax
+
+    # Global error
+    df = pd.Series(stats.global_error)
+    if smoothed:
+        ma = df.rolling(rolling_window).mean()
+        mstd = df.rolling(rolling_window).std()
+
+        lower_bound = ma-mstd
+        upper_bound = ma+mstd
+        ax[0].plot(ma.index, ma, color=colors[0], label="Global error")
+        ax[0].fill_between(mstd.index, lower_bound, upper_bound, alpha=0.15, color=colors[0])
+    else:
+        ax[0].plot(df, color=colors[0], label="Global error")
+
+    ax[0].set_xlabel("Iterations")
+    ax[0].set_ylabel("Global error")
+    ax[0].set_title("Global error")
+
+    # Global mean error
+    df = pd.Series(np.array(stats.global_error)/np.array(stats.graph_order))
+    if smoothed:
+        ma = df.rolling(rolling_window).mean()
+        mstd = df.rolling(rolling_window).std()
+
+        lower_bound = ma-mstd
+        upper_bound = ma+mstd
+        ax[0].plot(ma.index, ma, color=colors[1], label="Global mean error")
+        ax[0].fill_between(mstd.index, lower_bound, upper_bound, alpha=0.15, color=colors[1])
+    else:
+        ax[0].plot(df, color=colors[1], label="Global mean error")
+    
+    ax[0].legend()
+
+    # Global utility
+    df = pd.Series(stats.global_utility)
+    if smoothed:
+        ma = df.rolling(rolling_window).mean()
+        mstd = df.rolling(rolling_window).std()
+
+        lower_bound = ma-mstd
+        upper_bound = ma+mstd
+        ax[1].plot(ma.index, ma, color=colors[1])
+        ax[1].fill_between(mstd.index, lower_bound, upper_bound, alpha=0.15, color=colors[1])
+    else:
+        ax[1].plot(df, color=colors[1])
+    ax[1].set_xlabel("Iterations")
+    ax[1].set_ylabel("Global utility")
+    ax[1].set_title("Global utility")
+
+    # Graph size and order
+    df = pd.Series(stats.graph_order)
+    ma = df.rolling(rolling_window).mean()
+    mstd = df.rolling(rolling_window).std()
+
+    lower_bound = ma-mstd
+    upper_bound = ma+mstd
+
+    ax[2].plot(ma.index, ma, color=colors[2], label="Graph order, |V|")
+    ax[2].fill_between(mstd.index, lower_bound, upper_bound, alpha=0.15, color=colors[2])
+    df = pd.Series(stats.graph_size)
+    ma = df.rolling(rolling_window).mean()
+    mstd = df.rolling(rolling_window).std()
+
+    lower_bound = ma-mstd
+    upper_bound = ma+mstd
+
+    ax[2].plot(ma.index, ma, color=colors[3], label="Graph size, |E|")
+    ax[2].fill_between(mstd.index, lower_bound, upper_bound, alpha=0.15, color=colors[3])
+
+    ax[2].set_xlabel("Iterations")
+    ax[2].set_title("Graph properties")
+    ax[2].legend()
+    if not def_ax:
+        fig.tight_layout()
 
 def project_best_actions(state_actions, action_names, symbols, colors, axis_names=["X", "Y"], title="Best actions", ax=None, legend=True):
 
@@ -35,9 +115,11 @@ def project_best_actions(state_actions, action_names, symbols, colors, axis_name
     if not ax:
         fig.tight_layout()
 
-def project_mlgng_actions(mlgng, state_size, action_names, symbols, colors, title="ML-GNG layers projection", unravel=False, round=False, axis_names=["X", "Y"], ax=None, legend=True):
-    if not ax:
+def project_mlgng_actions(mlgng, state_size, action_names, symbols, colors, title="ML-GNG layers projection", unravel=False, round=False, axis_names=["X", "Y"], def_ax=None, legend=True):
+    if not def_ax:
         fig, ax = plt.subplots(figsize=(10, 10))
+    else:
+        ax = def_ax
     # Plot discretization as a grid
     ax.grid(True)
     for i in range(len(action_names)):
@@ -62,7 +144,7 @@ def project_mlgng_actions(mlgng, state_size, action_names, symbols, colors, titl
     ax.set_yticks(np.arange(state_size[0]+1))
     ax.set_title(title)
     
-    if not ax:
+    if not def_ax:
         fig.tight_layout()
 
 def plot_mlgng_actions_3d(mlgng, state_size, action_names, symbols, colors, title="ML-GNG layers", unravel=False, round=False, axis_names=["X", "Y", "Z"], full_projection=False):
@@ -309,4 +391,4 @@ def visualize_samples(samples, discretized_samples, grid, low=None, high=None):
     ax.plot(samples[:, 0], samples[:, 1], 'o', label='Original')
     ax.plot(locs[:, 0], locs[:, 1], 's', label='Discretized')
     ax.legend()
-    ax.add_collection(mc.LineCollection(list(zip(samples, locs)), colors='orange'))
+    ax.add_collection(LineCollection(list(zip(samples, locs)), colors='orange'))

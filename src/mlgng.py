@@ -88,7 +88,7 @@ class MultiLayerGrowingNeuralGas():
 
         return best_action
 
-    def stats(self, one_line=False):
+    def print_stats(self, one_line=False):
         if one_line:
             nodes = []
             edges = []
