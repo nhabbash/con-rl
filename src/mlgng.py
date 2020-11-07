@@ -38,16 +38,16 @@ class MultiLayerGrowingNeuralGas():
 
         if m == -1:
             for i in range(self.m):
-                self.layers[i].set_parameters(**params)
+                self[i].set_parameters(**params)
         else:
-            self.layers[m].set_parameters(**params)
+            self[m].set_parameters(**params)
 
     def update_discount_rate(self, discount_rate, m=-1):
         if m == -1:
             for i in range(self.m):
-                self.layers[i].discount_rate = discount_rate
+                self[i].discount_rate = discount_rate
         else:
-                self.layers[m].discount_rate = discount_rate
+                self[m].discount_rate = discount_rate
                 
     def _format_state(self, s):
         
@@ -65,7 +65,7 @@ class MultiLayerGrowingNeuralGas():
             m (int): Layer
         '''
         s = self._format_state(s)
-        self.layers[m].fit(s)
+        self[m].fit(s)
 
     def policy(self, s):
         '''
@@ -79,7 +79,7 @@ class MultiLayerGrowingNeuralGas():
 
         A = np.empty(self.m)
         for i in range(self.m):
-            _, _, error_w, _ = self.layers[i]._nearest_neighbors(s)
+            _, _, error_w, _ = self[i]._nearest_neighbors(s)
             A[i] = error_w
         
         best_action = np.argmin(A)
@@ -93,11 +93,11 @@ class MultiLayerGrowingNeuralGas():
             nodes = []
             edges = []
             for i in range(self.m):
-                nodes.append(str(len(self.layers[i].g.get_vertices())))
-                edges.append(str(len(self.layers[i].g.get_edges())))
+                nodes.append(str(len(self[i].g.get_vertices())))
+                edges.append(str(len(self[i].g.get_edges())))
             
             print("\t MLGNG nodes per action layer: "+" ".join(nodes))
         else:
             for i in range(self.m):
                 print("> Layer: ", i)
-                self.layers[i].stats()
+                self[i].stats()
