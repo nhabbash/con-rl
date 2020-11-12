@@ -1,0 +1,38 @@
+program: train.py
+method: bayes
+metric:
+  name: reward
+  goal: maximize
+parameters:
+  mlgng_params.a:
+    distribution: uniform
+    min: 0.25
+    max: 1
+  mlgng_params.b:
+    distribution: uniform
+    min: 0.01
+    max: 0.95
+  mlgng_params.k:
+    distribution: int_uniform
+    min: 500
+    max: 2000
+  mlgng_params.l:
+    distribution: int_uniform
+    min: 5
+    max: 20
+  mlgng_params.e_n:
+    distribution: uniform
+    min: 0.05
+    max: 0.2
+  mlgng_params.e_w:
+    distribution: uniform
+    min: 0.25
+    max: 1
+  mlgng_params.max_age:
+    distribution: int_uniform
+    min: 5
+    max: 20
+  mlgng_params.max_nodes:
+    distribution: int_uniform
+    min: 5
+    max: 20

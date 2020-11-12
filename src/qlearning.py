@@ -1,6 +1,5 @@
 import numpy as np
-import sys
-import itertools
+import time
 
 class QLearningAgent:
     '''
@@ -84,15 +83,15 @@ class QLearningAgent:
     def set_debug(self, flag=True):
         self.debug = flag
 
-    def decay_epsilon(self, i=None):
-        self.epsilon -= self.epsilon_decay_rate
-        #self.epsilon = self.epsilon*self.epsilon_decay_rate
-        #self.epsilon = np.exp(-self.epsilon_decay_rate*i)
-        self.epsilon = max(self.epsilon, self.min_epsilon)
-
-    def decay_alpha(self, i=None):
-        self.alpha -= self.alpha_decay_rate
-        self.alpha = max(self.alpha, self.min_alpha)
+    def decay_param(self, param):
+        decay = getattr(self, param+"_decay_rate", 0)
+        value = getattr(self, param, 0)
+        min_value = getattr(self, "min_"+param, 0)
+        setattr(self, param, max(value-decay, min_value))
+        # self.epsilon -= self.epsilon_decay_rate
+        # #self.epsilon = self.epsilon*self.epsilon_decay_rate
+        # #self.epsilon = np.exp(-self.epsilon_decay_rate*i)
+        # self.epsilon = max(self.epsilon, self.min_epsilon)
 
     def update(self, state, next_state, best_action, reward):
         '''
@@ -105,33 +104,54 @@ class QLearningAgent:
         td_error = td_target - self.Q[t]
         self.Q[t] += self.alpha * td_error
 
-    def decide(self, state, env):
-        '''
-        Train for a single step
-        '''
+    def step(self, state, env):
         action = self.policy(state)
         next_state, reward, done, _ = env.step(action)
         self.update(state, next_state, action, reward)
         state = next_state
 
-        return next_state, done
+        return next_state, reward, done
 
-    def train(self, env, num_episodes):
-        '''
-        Train for a num_episodes
-        '''
-        
-        for i_episode in range(num_episodes):
-            # Print out which episode we're on, useful for debugging.
-            if (i_episode + 1) % 100 == 0 and self.debug:
-                print("\rEpisode {}/{}.".format(i_episode + 1, num_episodes), end="")
-                sys.stdout.flush()
-            
-            # Generate episode
+    def train(self, env, num_episodes, stats):
+
+        for episode in range(num_episodes):
+            done = False
+            step = 0
+            cumulative_reward = 0
+
+            start = time.time()
             state = env.reset()
-            for step in itertools.count():
-                next_state, done = self.decide(state, env)
 
-                if done:
-                    break
+            while not done:
+                next_state, reward, done = self.step(state, env)
                 state = next_state
+                step+=1
+                cumulative_reward+=reward
+            self.decay_param("epsilon")
+
+            stats["cumulative_reward"][episode] = cumulative_reward
+            stats["step"][episode] = step 
+            stats["q_tables"][episode] = self.Q
+
+            end = time.time() - start
+            if episode % 100 == 0:
+                print("Episode {}/{}, Reward {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
+                    episode, 
+                    num_episodes, 
+                    stats["cumulative_reward"][episode], 
+                    stats["step"][episode], 
+                    self.epsilon, 
+                    self.alpha,
+                    end))
+
+    def get_best_actions(self):
+        best_actions_table = np.argmax(self.Q, axis=2)
+        length = np.prod(self.state_size)
+        best_actions = np.zeros((length, self.action_size))
+
+        for idx in range(length):
+            state = np.unravel_index(idx, self.state_size)
+            best_a = best_actions_table[state]
+            best_actions[idx] = state + (best_a, )
+
+        return best_actions.T

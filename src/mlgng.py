@@ -18,6 +18,7 @@ class MultiLayerGrowingNeuralGas():
     def __init__(self, m, ndim):
         self.m = m
         self.layers = defaultdict()
+        self.ndim = ndim
         for i in range(m):
             self.layers[i] = GrowingNeuralGas(ndim=ndim)
 
@@ -101,3 +102,27 @@ class MultiLayerGrowingNeuralGas():
             for i in range(self.m):
                 print("> Layer: ", i)
                 self[i].stats()
+
+    def get_nodes(self):
+        # Useful for data visualization
+        fdata = np.array([[], [], []])
+
+        for i in range(self.m):
+            pos = self[i].g.vp.pos.get_2d_array(pos=np.arange(self.ndim))
+            data = np.ones((pos.shape[0]+1, pos.shape[1]))*i # Add a column
+            data[:-1,:] = pos
+            fdata = np.hstack((fdata, data))
+
+        return fdata
+
+    def get_last_stat_tuple(self, name):
+        # Gets last elements of the stats for logging
+        dict = {}
+        for action in range(self.m):
+            stat = getattr(self[action].stats, name)
+            val = 0
+            if len(stat) > 0:
+                val =  stat[-1]
+            dict[action] = val
+
+        return dict

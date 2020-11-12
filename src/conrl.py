@@ -1,6 +1,7 @@
 from .mlgng import MultiLayerGrowingNeuralGas
 from .qlearning import QLearningAgent
 import numpy as np
+import time
 
 class ConRL():
     '''
@@ -31,7 +32,7 @@ class ConRL():
         self.mlgng = MultiLayerGrowingNeuralGas(m=self.action_size, ndim=params["ndim"])
         self.mlgng.set_layers_parameters(params, m=-1)
 
-    def _simple_action_selector(self, state):
+    def simple_action_selector(self, state):
         '''
         Action selection, if MLGNG has an action, select it, otherwise get it from QL
 
@@ -74,7 +75,7 @@ class ConRL():
             self.mlgng.update(state, support_best_action)
 
 
-    def step(self, state, env, window_size=None, discretize=None):
+    def step(self, state, env):
         '''
         Executes a step and updates the two agents
 
@@ -82,13 +83,8 @@ class ConRL():
             state (tuple): Sampled state
             env (OpenAI gym): Environment
         '''
-        best_action, _, support_best_action, selected = self._simple_action_selector(state)
-        next_obs, reward, done, _ = env.step(best_action)
-        
-        if discretize:
-            next_state = discretize(next_obs, window_size, env)
-        else:
-            next_state = next_obs
+        best_action, _, support_best_action, selected = self.simple_action_selector(state)
+        next_state, reward, done, _ = env.step(best_action)
 
         # Supporting agent update
         #state = (state, ) #TODO TMP FIX for 1d env!!
@@ -96,5 +92,54 @@ class ConRL():
 
         # MLGNG agent update
         self.mlgng_update_strategy(state, support_best_action)
-        # print(next_state, best_action, selected)
+
         return next_state, reward, done, selected
+
+    def train(self, env, num_episodes, stats):
+        
+        for episode in range(num_episodes):
+            done = False
+            step = 0
+            cumulative_reward = 0
+            selector_sequence = []
+
+            start = time.time()
+            state = env.reset()
+
+            while not done:
+                next_state, reward, done, selected = self.step(state, env)
+                state = next_state
+                
+                cumulative_reward += reward
+                selector_sequence.append(selected)
+                step+=1
+
+            self.support.decay_param("epsilon")
+
+            stats["selector"][episode] = sum(selector_sequence)/len(selector_sequence)
+            stats["cumulative_reward"][episode] = cumulative_reward
+            stats["step"][episode] = step 
+            stats["best_actions"].append(self.get_best_actions())
+            stats["mlgng_nodes"].append(self.mlgng.get_nodes())
+                
+            end = time.time() - start
+            if episode % 100 == 0:
+                print("Episode {}/{}, Reward {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
+                    episode, 
+                    num_episodes, 
+                    stats["cumulative_reward"][episode], 
+                    stats["step"][episode], 
+                    self.support.epsilon, 
+                    self.support.alpha, 
+                    end))
+                self.mlgng.print_stats(one_line=True)
+
+    def get_best_actions(self):
+        length = np.prod(self.state_size)
+        best_actions = np.zeros((length, self.action_size))
+
+        for idx in range(length):
+            state = np.unravel_index(idx, self.state_size)
+            best_a, _, _, _ = self.simple_action_selector(state)
+            best_actions[idx] = state + (best_a, )
+        return best_actions.T
