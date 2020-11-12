@@ -2,12 +2,6 @@ from graph_tool import Graph
 import numpy as np
 from collections import namedtuple
 
-GNGStats = namedtuple("GNGStats", ["global_error",
-                                    "global_utility",
-                                    "graph_order", # |V|
-                                    "graph_size", # |E|
-                                    ]) 
-
 class GrowingNeuralGas():
     '''
     Growing Neural Gas with Utility implementation 

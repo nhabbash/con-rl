@@ -74,7 +74,6 @@ class ConRL():
             self.mlgng.update_discount_rate(self.support.epsilon) # TODO remove dependance from support
             self.mlgng.update(state, support_best_action)
 
-
     def step(self, state, env):
         '''
         Executes a step and updates the two agents
@@ -94,6 +93,7 @@ class ConRL():
         self.mlgng_update_strategy(state, support_best_action)
 
         return next_state, reward, done, selected
+
 
     def train(self, env, num_episodes, stats):
         

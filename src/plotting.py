@@ -7,6 +7,8 @@ import mpl_toolkits.mplot3d.art3d as art3d
 from matplotlib.patches import Rectangle
 from matplotlib import cm
 from matplotlib.colors import Normalize
+import plotly.graph_objects as go
+
 
 def dict_to_namedtuple(dict):
     nt = namedtuple('nt', dict)
@@ -93,58 +95,6 @@ def plot_gng_stats(stats, rolling_window=10, smoothed=False, colors=cm.Dark2(np.
     ax[2].legend()
     if not def_ax:
         fig.tight_layout()
-
-def plot_mlgng_actions_3d(mlgng, state_size, action_names, symbols, colors, title="ML-GNG layers", unravel=False, round=False, axis_names=["X", "Y", "Z"], full_projection=False):
-    fig = plt.figure(figsize=(8, 8))
-    ax = fig.add_axes([0,0,1,1], projection='3d')
-    
-    gx = np.arange(state_size[0]+1)
-    gy = np.arange(state_size[1]+1)
-
-    for i in range(len(action_names)):
-        if unravel:
-            # We're unraveling because the state_space is 1D and we want to make it 2D (eg gridworld)
-            x, y = np.unravel_index(np.around(mlgng[i].g.vp.pos.get_2d_array(pos=[0])[0]).astype(int), state_size)
-        else:
-            if round:
-                x, y = np.around(mlgng[i].g.vp.pos.get_2d_array(pos=[0, 1])).astype(int)
-            else:
-                x, y = mlgng[i].g.vp.pos.get_2d_array(pos=[0, 1])
-
-        ax.scatter(x, y, i, marker=symbols[i], s=100, c=[colors[i]], label="Action: {}".format(action_names[i]))
-
-        p = Rectangle((0,0), state_size[0], state_size[1], color=colors[i], alpha=0.15)
-        # grid lines
-        for x in gx:
-            ax.plot3D([x, x], [gy[0], gy[-1]], i, color=colors[i], alpha=.7, linestyle=':')
-        for y in gy:
-            ax.plot3D([gx[0], gx[-1]], [y, y], i, color=colors[i], alpha=.7, linestyle=':')
-
-        ax.add_patch(p)
-        art3d.pathpatch_2d_to_3d(p, z=i, zdir="z")
-
-    # plot connection lines
-    # ax.plot([x[0],y[0],x[0]],[y[0],x[0],y[0]],[0.4,0.9,1.6], color="k")
-    # ax.plot([x[2],y[2],x[2]],[y[2],x[2],y[2]],[0.4,0.9,1.6], color="k")
-    
-    ax.set_xlabel(axis_names[0])
-    ax.set_ylabel(axis_names[1])
-    ax.set_zlabel(axis_names[2])
-
-    ax.set_aspect('auto')
-
-    # ax.set_xticks(np.arange(state_size[1]))
-    # ax.set_yticks(np.arange(state_size[0]))
-    ax.set_zticks(np.arange(len(action_names)))
-
-    ax.set_xlim(0, state_size[0])
-    ax.set_ylim(0, state_size[1])
-    
-    ax.grid(False)
-    #ax.view_init(elev=15., azim=60)
-    plt.title(title)
-    plt.legend()
-    plt.show()
 
 
 def plot_q_table_3d(q_table, state_size, title="Q-table", axis_names=["X", "Y", "Z"]):
@@ -296,7 +246,8 @@ def project_nodes(nodes,
                     axis_names=["X", "Y"], 
                     def_plot=None,
                     figsize=(10, 10),
-                    legend=False):
+                    legend=False,
+                    labels=False):
     if not def_plot:
         fig, ax = plt.subplots(figsize=figsize)
     else:
@@ -310,7 +261,10 @@ def project_nodes(nodes,
     layered_nodes = [nodes[:, nodes[-1]==i] for i in range(len(action_names))]
     for i, nodes in enumerate(layered_nodes):
         x, y, _ = nodes
-        ax.scatter(x, y, label='Action: {}'.format(action_names[i]), marker=symbols[i], c=[colors[i]], s=10**2)
+        label = None
+        if labels:
+            label = 'Action: {}'.format(action_names[i])
+        ax.scatter(x, y, label=label, marker=symbols[i], c=[colors[i]], s=10**2)
 
     if legend:
         ax.legend(bbox_to_anchor=(0.5, -0.05), loc='upper center', ncol=3)
@@ -321,10 +275,143 @@ def project_nodes(nodes,
     ax.grid(True)
     ax.set_ylabel(axis_names[1])
 
-    ax.set_xticks(np.arange(state_size[1]))
-    ax.set_yticks(np.arange(state_size[0]))
+    ax.set_xlim(-0.5, state_size[0]-0.5)
+    ax.set_ylim(-0.5, state_size[1]-0.5)
+    
+    ax.set_xticks(np.arange(state_size[0]))
+    ax.set_yticks(np.arange(state_size[1]))
     if title:
         ax.set_title(title)
     
     if not def_plot:
         fig.tight_layout()
+
+
+def plot_nodes_3d(nodes, 
+                state_size, 
+                action_names, 
+                symbols, 
+                colors, 
+                title="ML-GNG layers", 
+                unravel=False, 
+                round=False, 
+                axis_names=["X", "Y", "Z"],
+                def_plot=None,
+                figsize=(10, 10),
+                legend=False):
+    
+    if not def_plot:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig, ax = def_plot
+
+    ax = fig.add_axes([0,0,1,1], projection='3d')
+
+    if unravel:
+        # We're unraveling because the state_space is 1D and we want to make it 2D (eg gridworld)
+        nodes = np.unravel_index(np.around(nodes).astype(int), state_size)
+    elif round:
+        nodes = np.around(nodes).astype(int)
+    
+    gx = np.arange(state_size[0]+1)
+    gy = np.arange(state_size[1]+1)
+
+    layered_nodes = [nodes[:, nodes[-1]==i] for i in range(len(action_names))]
+    for i, nodes in enumerate(layered_nodes):
+        x, y, _ = nodes
+        ax.scatter(x, y, i, marker=symbols[i], s=100, c=[colors[i]], label="Action: {}".format(action_names[i]))
+        
+        p = Rectangle((0,0), state_size[0], state_size[1], color=colors[i], alpha=0.15)
+        # grid lines
+        for x in gx:
+            ax.plot3D([x, x], [gy[0], gy[-1]], i, color=colors[i], alpha=.7, linestyle=':')
+        for y in gy:
+            ax.plot3D([gx[0], gx[-1]], [y, y], i, color=colors[i], alpha=.7, linestyle=':')
+
+        ax.add_patch(p)
+        art3d.pathpatch_2d_to_3d(p, z=i, zdir="z")
+
+    # plot connection lines
+    # ax.plot([x[0],y[0],x[0]],[y[0],x[0],y[0]],[0.4,0.9,1.6], color="k")
+    # ax.plot([x[2],y[2],x[2]],[y[2],x[2],y[2]],[0.4,0.9,1.6], color="k")
+    
+    ax.set_xlabel(axis_names[0])
+    ax.set_ylabel(axis_names[1])
+    ax.set_zlabel(axis_names[2])
+
+    ax.set_aspect('auto')
+
+    # ax.set_xticks(np.arange(state_size[1]))
+    # ax.set_yticks(np.arange(state_size[0]))
+    ax.set_zticks(np.arange(len(action_names)))
+
+    ax.set_xlim(0, state_size[0])
+    ax.set_ylim(0, state_size[1])
+    # ax.set_xticks(np.arange(state_size[0]))
+    # ax.set_yticks(np.arange(state_size[1]))
+    
+    ax.grid(False)
+    #ax.view_init(elev=15., azim=60)
+    plt.title(title)
+    plt.legend()
+    plt.show()
+
+def plot_nodes_changes(stats_series, action_names, symbols, colors, figsize=(600, 600)):
+
+    # Create figure
+    fig = go.Figure()
+
+    # Add traces, one for each slider step
+    for idx, nodes in enumerate(stats_series):
+        if idx % 10 == 0:
+            for i in range(len(action_names)):
+                x, y, _ = nodes[:, nodes[-1]==i]
+                fig.add_trace(
+                    go.Scatter(
+                        visible=False,
+                        mode="markers",
+                        name=action_names[i],
+                        marker_symbol=symbols[i],
+                        marker=dict(size=12,
+                                    color="rgba(" + ",".join([str(int(item)) for item in colors[i]]) + ")"),
+                        x=x,
+                        y=y)
+                        )
+
+    fig.data[0].visible = True
+    fig.data[1].visible = True
+    fig.data[2].visible = True
+
+    # Create and add slider
+    steps = []
+    i = 0
+    for idx in range(len(fig.data)//3):
+        step = dict(
+            method="update",
+            args=[{"visible": [False] * len(fig.data)},
+                {"title": "Episode: " + str(idx*10)}],  # layout attribute
+        )
+        step["args"][0]["visible"][i] = True  # Toggle i'th trace to "visible"
+        step["args"][0]["visible"][i+1] = True  # Toggle i'th trace to "visible"
+        step["args"][0]["visible"][i+2] = True  # Toggle i'th trace to "visible"
+        steps.append(step)
+        i+=3
+
+    sliders = [dict(
+        active=0,
+        pad={"t": 50},
+        steps=steps
+    )]
+
+    fig.update_layout(
+        autosize=False,
+        width=figsize[0],
+        height=figsize[1],
+        sliders=sliders,
+        yaxis=dict( range=[-0.5, 9.5],
+                    tickmode="linear"),
+        xaxis=dict( range=[-0.5, 9.5],
+                    tickmode="linear"),
+    )
+
+    fig.show()

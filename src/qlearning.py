@@ -132,6 +132,7 @@ class QLearningAgent:
             stats["cumulative_reward"][episode] = cumulative_reward
             stats["step"][episode] = step 
             stats["q_tables"][episode] = self.Q
+            stats["best_actions"].append(self.get_best_actions())
 
             end = time.time() - start
             if episode % 100 == 0:
