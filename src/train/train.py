@@ -2,28 +2,26 @@ from ..conrl import ConRL
 from ..utils import *
 
 import time
-import sys
-from collections import defaultdict
-import itertools
 
 import numpy as np
 import pandas as pd
 import wandb
 import gym
 
-env = gym.make('MountainCar-v0')
 state_size = (10, 10)
-window_size = (env.observation_space.high - env.observation_space.low)/state_size
+env = DiscretizationWrapper(gym.make('MountainCar-v0'), state_size)
+
 num_episodes = 500
 max_step = 1000
-env._max_episode_steps = max_step
+env.env._max_episode_steps = max_step
+env.spec.max_episode_steps = max_step
 
 q_params = {
     "gamma": 0.9,
     "alpha": 0.1,
     "alpha_decay_rate": 0,
     "min_alpha": 0.1,
-    "epsilon": 1.0,
+    "epsilon": 0.9,
     "epsilon_decay_rate": 0,
     "min_epsilon": 0.1
 }
@@ -37,16 +35,16 @@ mlgng_params = {
     "e_n":0.1, 
     "l":10, 
     "a":0.5, 
-    "b":0.95,
+    "b":0.6,
     "k":1000.0, 
     "max_nodes": 10, 
     "max_age": 10
 }
 
-stats_cr= {
-        "episode_lengths":  np.zeros(num_episodes),
-        "episode_rewards":  np.zeros(num_episodes),
-        "selector_dist":    np.zeros((num_episodes, max_step)).astype(int),
+stats = {
+        "step":  np.zeros(num_episodes),
+        "cumulative_reward":  np.zeros(num_episodes),
+        "selector":    np.zeros(num_episodes),
         "mlgng_nodes":      [],
         "best_actions":     [],
 }
@@ -54,59 +52,56 @@ stats_cr= {
 wandb.init(
     entity="dodicin",
     project="con-rl",
-    notes="test",
-    tags=["q-learning", "mlgng"],
-    config={"q_params": q_params,
-            "mlgng_params": mlgng_params})
+    notes="test2",
+    tags=["q-learning", "mlgng"])
 
 config = wandb.config
 
 conrl = ConRL(action_size=env.action_space.n, state_size=state_size, update_threshold=10)
-conrl.init_support(**config.q_params)
-conrl.init_mlgng(**config.mlgng_params)
+conrl.init_support(**q_params)
+conrl.init_mlgng(**mlgng_params)
 
 for episode in range(num_episodes):
     done = False
-    success = False
     step = 0
     cumulative_reward = 0
-    selector_dist_ep = np.zeros(max_step)
+    selector_sequence = []
 
     start = time.time()
-    obs = env.reset()
+    state = env.reset()
 
-    state = get_discrete_state(obs, window_size, env)
     while not done:
-        next_state, reward, done, selected = conrl.step(state, env, window_size=window_size, discretize=get_discrete_state)
+        next_state, reward, done, selected = conrl.step(state, env)
         state = next_state
         
         cumulative_reward += reward
-        selector_dist_ep[step] = selected
-
+        selector_sequence.append(selected)
         step+=1
-        if step >= max_step:
-            break
 
-    stats_cr["selector_dist"][episode] = selector_dist_ep
-    stats_cr["episode_rewards"][episode] = cumulative_reward
-    stats_cr["episode_lengths"][episode] = step
+    conrl.support.decay_param("epsilon")
+
+    stats["selector"][episode] = sum(selector_sequence)/len(selector_sequence)
+    stats["cumulative_reward"][episode] = cumulative_reward
+    stats["step"][episode] = step 
+    stats["best_actions"].append(conrl.get_best_actions())
+    stats["mlgng_nodes"].append(conrl.mlgng.get_nodes())
 
     wandb.log({
-        'reward': stats_cr["episode_rewards"][episode], 
-        'steps': stats_cr["episode_lengths"][episode],
-        'selector': np.mean(stats_cr["selector_dist"][episode]),
+        'cumulative_reward': stats["episode_rewards"][episode], 
+        'step': stats["step"][episode],
+        'selector': stats["selector"][episode],
         'global_error': conrl.mlgng.get_last_stat_tuple("global_error"),
-        'node_number': np.sum([len(conrl.mlgng[i].g.get_vertices()) for i in range(conrl.mlgng.m)])
-        })
+        'node_number': [len(conrl.mlgng[i].g.get_vertices()) for i in range(conrl.mlgng.m)]
+    })
         
-    conrl.support.decay_epsilon(episode)
     end = time.time() - start
-    if episode % 100 == 0:
-        print("Episode {}/{}, Reward {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
-            episode, 
+    if (episode+1) % 50 == 0:
+        print("Episode {}/{}, Reward {}, Average Max Reward: {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
+            episode+1, 
             num_episodes, 
-            stats_cr["episode_rewards"][episode], 
-            stats_cr["episode_lengths"][episode], 
+            stats["cumulative_reward"][episode],
+            stats["cumulative_reward"][episode-10:episode].mean(),
+            stats["step"][episode], 
             conrl.support.epsilon, 
             conrl.support.alpha, 
             end))

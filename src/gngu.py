@@ -30,9 +30,10 @@ class GrowingNeuralGas():
     @author: Nassim Habbash
     '''
 
-    def __init__(self, ndim, discount_rate=1, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
+    def __init__(self, ndim, id=0, discount_rate=1, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
         
         self.g = Graph(directed=False)
+        self.id = id
         self.ndim = ndim
         self.e_w = e_w
         self.e_n = e_n
@@ -173,7 +174,7 @@ class GrowingNeuralGas():
         lowest_utility = nodes_props[lowest_utility_node, -2]
 
         if highest_error > self.k * lowest_utility and self.initialized:
-            self.g.remove_vertex(lowest_utility_node, fast=True)
+            self.g.remove_vertex(lowest_utility_node)
 
         return highest_error_node
 
@@ -184,8 +185,11 @@ class GrowingNeuralGas():
         # TODO: error-based insertion rate (ie when mean squared error is larger than a threshold add node)
 
         if self.i % self.l == 0 and len(self.g.get_vertices()) != self.max_nodes:
-            # print(highest_error_node)
+            # try:
             neighbors = self.g.get_all_neighbors(highest_error_node, vprops=[self.g.vp.error])
+            # except:
+            #     print(highest_error_node)
+            #     print(self.id)
 
             if neighbors.size > 0:
                 highest_error_neighbor = np.argmax(neighbors[:, -1], axis=0)
@@ -211,8 +215,8 @@ class GrowingNeuralGas():
         '''
         Discounts error and utility
         '''
-        self.g.vp.error.a -= self.g.vp.error.a * self.b
-        self.g.vp.utility.a -= self.g.vp.error.a * self.b
+        self.g.vp.error.a *= self.b
+        self.g.vp.utility.a *= self.b
 
     def _add_init_node(self, s):
         '''
@@ -236,10 +240,11 @@ class GrowingNeuralGas():
 
         self.i+=1
         self.initialized = False if len(self.g.get_vertices()) < 2 else True
+        #self.g.shrink_to_fit()
 
         # Stats
-        self.stats["global_error"].append(np.sum(self.g.vp.error.get_array()))
-        self.stats["global_utility"].append(np.sum(self.g.vp.utility.get_array()))
+        self.stats["global_error"].append(np.mean(self.g.vp.error.get_array()))
+        self.stats["global_utility"].append(np.mean(self.g.vp.utility.get_array()))
         self.stats["graph_order"].append(len(self.g.get_vertices()))
         self.stats["graph_size"].append(len(self.g.get_edges()))
         if debug:
@@ -247,7 +252,6 @@ class GrowingNeuralGas():
             self.print_stats()
 
     def print_stats(self, full=False):
-        # TODO: Error tracking
         if self.i%100!=0 and full:
             return
 

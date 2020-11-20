@@ -139,13 +139,13 @@ def plot_q_table(q_table,
 
     for action in np.unique(q_actions):
         x, y = np.where(q_actions==action)
-        ax.scatter(x, y, label='Action: {}'.format(action_names[action]), marker=symbols[action], s=10**2, c=[colors[action]])
+        ax.scatter(x, y, label='Action: {}'.format(action_names[action]), marker=symbols[action], s=20**2, c=[colors[action]])
             
     ax.grid(False)
     ax.set_title("{} \n size: {}".format(title, q_table.shape))
     ax.set_xlabel(axis_names[0])
     ax.set_ylabel(axis_names[1])
-    ax.legend(bbox_to_anchor=(0, -0.125,1,0.2), loc="lower left",mode="expand", borderaxespad=0, ncol=3)
+    ax.legend(bbox_to_anchor=(0, -0.125,1,0.2), loc="lower left",mode="expand", borderaxespad=0, ncol=len(action_names))
 
 
 def plot_stats(stats, 
@@ -196,7 +196,7 @@ def plot_stats_comparison(stats_dict,
     
     for i, (model_name, stats) in enumerate(stats_dict.items()):
         _colors = np.tile(colors[i], (len(stats), 1))
-        plot_stats(stats, def_plot=(fig, ax), label=model_name, colors=_colors)
+        plot_stats(stats, def_plot=(fig, ax), label=model_name, colors=_colors, rolling_window=rolling_window)
 
     for axe in ax:
         axe.legend()
@@ -254,7 +254,10 @@ def project_nodes(nodes,
         fig, ax = def_plot
 
     if unravel:
-        nodes = np.unravel_index(np.around(nodes).astype(int), state_size)
+        nodes_new = np.zeros((nodes.shape[0]+1, nodes.shape[1])) 
+        nodes_new[0:-1, :] = np.unravel_index(np.around(nodes[0]).astype(int), state_size)
+        nodes_new[-1, :] = nodes[-1]
+        nodes = nodes_new
     elif round:
         nodes = np.around(nodes).astype(int)
 
@@ -267,7 +270,7 @@ def project_nodes(nodes,
         ax.scatter(x, y, label=label, marker=symbols[i], c=[colors[i]], s=10**2)
 
     if legend:
-        ax.legend(bbox_to_anchor=(0.5, -0.05), loc='upper center', ncol=3)
+        ax.legend(bbox_to_anchor=(0.5, -0.05), loc='upper center', ncol=len(action_names))
         ax.set_xlabel(axis_names[0], loc='left')
     else: 
         ax.set_xlabel(axis_names[0])
@@ -309,7 +312,10 @@ def plot_nodes_3d(nodes,
 
     if unravel:
         # We're unraveling because the state_space is 1D and we want to make it 2D (eg gridworld)
-        nodes = np.unravel_index(np.around(nodes).astype(int), state_size)
+        nodes_new = np.zeros((nodes.shape[0]+1, nodes.shape[1])) 
+        nodes_new[0:-1, :] = np.unravel_index(np.around(nodes[0]).astype(int), state_size)
+        nodes_new[-1, :] = nodes[-1]
+        nodes = nodes_new
     elif round:
         nodes = np.around(nodes).astype(int)
     
@@ -356,14 +362,14 @@ def plot_nodes_3d(nodes,
     plt.legend()
     plt.show()
 
-def plot_nodes_changes(stats_series, action_names, symbols, colors, figsize=(600, 600)):
+def plot_nodes_changes(stats_series, rewards, action_names, symbols, colors, frequency=10, figsize=(600, 600)):
 
     # Create figure
     fig = go.Figure()
 
     # Add traces, one for each slider step
     for idx, nodes in enumerate(stats_series):
-        if idx % 10 == 0:
+        if idx % frequency == 0:
             for i in range(len(action_names)):
                 x, y, _ = nodes[:, nodes[-1]==i]
                 fig.add_trace(
@@ -389,7 +395,7 @@ def plot_nodes_changes(stats_series, action_names, symbols, colors, figsize=(600
         step = dict(
             method="update",
             args=[{"visible": [False] * len(fig.data)},
-                {"title": "Episode: " + str(idx*10)}],  # layout attribute
+                {"title": "Episode: " + str(idx*frequency) + "<br> Reward: "+str(rewards[idx*frequency])}],  # layout attribute
         )
         step["args"][0]["visible"][i] = True  # Toggle i'th trace to "visible"
         step["args"][0]["visible"][i+1] = True  # Toggle i'th trace to "visible"

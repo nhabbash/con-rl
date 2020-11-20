@@ -25,8 +25,8 @@ class ConRL():
         self.action_counter = np.zeros(shape=shape)
         self.update_threshold = update_threshold
 
-    def init_support(self, **params):
-        self.support = QLearningAgent(action_size=self.action_size, state_size=self.state_size, **params)
+    def init_support(self, support):
+        self.support = support
 
     def init_mlgng(self, **params):
         self.mlgng = MultiLayerGrowingNeuralGas(m=self.action_size, ndim=params["ndim"])
@@ -71,8 +71,10 @@ class ConRL():
 
         # MLGNG Agent update
         if self.action_counter[state][support_best_action] >= self.update_threshold:
-            self.mlgng.update_discount_rate(self.support.epsilon) # TODO remove dependance from support
+            support_best_action = self.support.policy(state, exploitation=True)
             self.mlgng.update(state, support_best_action)
+            self.mlgng.update_discount_rate(self.support.epsilon) # TODO remove dependance from support
+            self.action_counter[state] = 0
 
     def step(self, state, env):
         '''
@@ -82,6 +84,9 @@ class ConRL():
             state (tuple): Sampled state
             env (OpenAI gym): Environment
         '''
+        if not isinstance(state, tuple):
+            state = (state, )
+            
         best_action, _, support_best_action, selected = self.simple_action_selector(state)
         next_state, reward, done, _ = env.step(best_action)
 
@@ -119,15 +124,18 @@ class ConRL():
             stats["selector"][episode] = sum(selector_sequence)/len(selector_sequence)
             stats["cumulative_reward"][episode] = cumulative_reward
             stats["step"][episode] = step 
+            stats["global_error"][episode] = self.mlgng.get_last_stat_tuple("global_error")
             stats["best_actions"].append(self.get_best_actions())
             stats["mlgng_nodes"].append(self.mlgng.get_nodes())
+
                 
             end = time.time() - start
-            if episode % 100 == 0:
-                print("Episode {}/{}, Reward {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
-                    episode, 
+            if (episode+1) % 50 == 0:
+                print("Episode {}/{}, Average Max Reward: {}, Global Error: {:.2f}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
+                    episode+1, 
                     num_episodes, 
-                    stats["cumulative_reward"][episode], 
+                    stats["cumulative_reward"][episode-10:episode].mean(),
+                    stats["global_error"][episode].sum(),
                     stats["step"][episode], 
                     self.support.epsilon, 
                     self.support.alpha, 
@@ -136,7 +144,7 @@ class ConRL():
 
     def get_best_actions(self):
         length = np.prod(self.state_size)
-        best_actions = np.zeros((length, self.action_size))
+        best_actions = np.empty((length, len(self.state_size)+1))
 
         for idx in range(length):
             state = np.unravel_index(idx, self.state_size)

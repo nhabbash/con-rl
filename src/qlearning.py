@@ -54,7 +54,7 @@ class QLearningAgent:
             self.epsilon_decay_rate = kwargs["epsilon_decay_rate"]
             self.min_epsilon = kwargs["min_epsilon"]
 
-    def policy(self, state):
+    def policy(self, state, exploitation=False):
         '''
         Epsilon greedy action selection
         '''
@@ -66,7 +66,7 @@ class QLearningAgent:
         #     best_action = np.argmax(self.Q[state])
         #     A[best_action] += (1.0 - self.epsilon)
 
-        if np.random.random() < self.epsilon and not self.exploitation:
+        if np.random.random() < self.epsilon and not exploitation:
             chosen_action = np.random.choice(self.actions)
         else:
             # Q-values to probabilities
@@ -105,6 +105,8 @@ class QLearningAgent:
         self.Q[t] += self.alpha * td_error
 
     def step(self, state, env):
+        if not isinstance(state, tuple):
+            state = (state, )
         action = self.policy(state)
         next_state, reward, done, _ = env.step(action)
         self.update(state, next_state, action, reward)
@@ -135,20 +137,21 @@ class QLearningAgent:
             stats["best_actions"].append(self.get_best_actions())
 
             end = time.time() - start
-            if episode % 100 == 0:
-                print("Episode {}/{}, Reward {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
-                    episode, 
+            if (episode+1) % 50 == 0:
+                print("Episode {}/{}, Reward {}, Average Max Reward: {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
+                    episode+1, 
                     num_episodes, 
-                    stats["cumulative_reward"][episode], 
+                    stats["cumulative_reward"][episode],
+                    stats["cumulative_reward"][episode-10:episode].mean(),
                     stats["step"][episode], 
                     self.epsilon, 
                     self.alpha,
                     end))
 
     def get_best_actions(self):
-        best_actions_table = np.argmax(self.Q, axis=2)
+        best_actions_table = np.argmax(self.Q, axis=len(self.state_size))
         length = np.prod(self.state_size)
-        best_actions = np.zeros((length, self.action_size))
+        best_actions = np.empty((length, len(self.state_size)+1))
 
         for idx in range(length):
             state = np.unravel_index(idx, self.state_size)
