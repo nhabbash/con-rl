@@ -154,6 +154,7 @@ def plot_stats(stats,
                 def_plot=None,
                 figsize=(10, 6),
                 label=None,
+                title = None
                 ):
 
     if def_plot is None:
@@ -175,6 +176,9 @@ def plot_stats(stats,
         ax[i].fill_between(mstd.index, lower_bound, upper_bound, alpha=0.15, color=colors[i])
         ax[i].set_xlabel("episode")
         ax[i].set_ylabel(key.replace("_", " "))
+    
+    if title:
+        fig.suptitle(title)
 
     fig.tight_layout()
 

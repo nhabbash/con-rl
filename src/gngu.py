@@ -50,8 +50,8 @@ class GrowingNeuralGas():
         self.stats = {
                         "global_error": [],
                         "global_utility": [],
-                        "graph_order": [],
-                        "graph_size": []
+                        "vertices": [],
+                        "edges": []
                     }
 
         # Property maps for graph and edge variables
@@ -154,17 +154,21 @@ class GrowingNeuralGas():
             edge = self.g.edge(e[0], e[1])
             self.g.remove_edge(edge)
 
-    def _prune_nodes(self):
+    def _prune_nodes_by_isolation(self):
         '''
-        Prunes nodes not connected to any edge and the node with the smallest utility if the highest error in the graph and smallest utility ratio is above k
+        Prunes nodes not connected to any edge
         '''
-
         # Remove unconnected nodes
         degrees = self.g.get_total_degrees(self.g.get_vertices())
 
         nodes = np.argwhere(degrees==0).flatten()
-        self.g.remove_vertex(nodes, fast=True)
-        
+        #self.g.remove_vertex(nodes, fast=True)
+        self.g.remove_vertex(nodes)
+
+    def _prune_nodes_by_utility(self):
+        '''
+        Prunes nodes with the smallest utility if the highest error in the graph and smallest utility ratio is above k
+        '''
         nodes_props = self.g.get_vertices(vprops=[self.g.vp.utility, self.g.vp.error])
 
         # Remove lowest utility node if the condition is met
@@ -178,11 +182,10 @@ class GrowingNeuralGas():
 
         return highest_error_node
 
-    def _add_node(self, highest_error_node):
+    def _add_node_interpolation(self, highest_error_node):
         '''
         Add node to underrepresented areas according to the lambda insertion rate
         '''
-        # TODO: error-based insertion rate (ie when mean squared error is larger than a threshold add node)
 
         if self.i % self.l == 0 and len(self.g.get_vertices()) != self.max_nodes:
             # try:
@@ -190,10 +193,9 @@ class GrowingNeuralGas():
             # except:
             #     print(highest_error_node)
             #     print(self.id)
-
             if neighbors.size > 0:
-                highest_error_neighbor = np.argmax(neighbors[:, -1], axis=0)
-                
+                # highest_error_neighbor = np.argmax(neighbors[:, -1], axis=0)
+                highest_error_neighbor = neighbors[np.argmax(neighbors[:, -1], axis=0), 0].astype(int)
                 p1 = self.g.vp.pos[highest_error_node]
                 p2 = self.g.vp.pos[highest_error_neighbor]
 
@@ -210,7 +212,47 @@ class GrowingNeuralGas():
                 
                 self.g.vp.error[highest_error_node] *= self.a
                 self.g.vp.error[highest_error_neighbor] *= self.a
+                self.g.vp.utility[highest_error_node] *= self.a
+                self.g.vp.utility[highest_error_neighbor] *= self.a
+
+    def _add_node_perturbed(self, highest_error_node):
+        '''
+        Add node to underrepresented areas according to the lambda insertion by cloning and perturbing the highest error node
+        '''
+
+        if self.i % self.l == 0 and len(self.g.get_vertices()) != self.max_nodes:
+            self.g.vp.error[highest_error_node] *= self.a
+            self.g.vp.utility[highest_error_node] *= self.a
+
+            neighbors = self.g.get_all_neighbors(highest_error_node)
+
+            v = self.g.add_vertex()
+            self.g.vp.error[v] = self.g.vp.error[highest_error_node]
+            self.g.vp.utility[v] = self.g.vp.utility[highest_error_node]
+            self.g.vp.pos[v] = self.g.vp.pos[highest_error_node] + np.random.normal(0, 1, self.ndim)
+
+            edge_list = np.full((neighbors.shape[0], 2), int(v))
+            edge_list[:, -1] = neighbors
+            self.g.add_edge_list(edge_list)
             
+    def _add_node_transfer(self, s):
+        '''
+        Add node
+        '''
+        if self.i % self.l == 0 and len(self.g.get_vertices()) != self.max_nodes:
+            s = np.array(s) + np.random.normal(0, 0.1, self.ndim)
+            v = self.g.add_vertex()
+
+            winner, second, _, _ = self._nearest_neighbors(s)
+            self.g.vp.error[v] = (self.g.vp.error[winner]+self.g.vp.error[second])/2
+            self.g.vp.utility[v] = (self.g.vp.utility[winner]+self.g.vp.utility[second])/2
+            self.g.vp.pos[v] = s
+
+            edge_list = np.full((2, 2), int(v))
+            edge_list[:, -1] = np.array([winner, second])
+            self.g.add_edge_list(edge_list)
+            
+
     def _discount(self):
         '''
         Discounts error and utility
@@ -226,6 +268,15 @@ class GrowingNeuralGas():
         self.g.vp.error[v] = 0.0
         self.g.vp.utility[v] = 0.0
         self.g.vp.pos[v] = s
+
+    def early_stopping(self):
+        global_error = np.mean(self.g.vp.error.get_array())
+        num_nodes = len(self.g.get_vertices())
+
+        error_condition = global_error <= num_nodes*10
+        zero_condition = global_error > 5
+
+        return error_condition and zero_condition
     
     def fit(self, s, debug=False):
         if len(self.g.get_vertices()) < 2:
@@ -233,20 +284,22 @@ class GrowingNeuralGas():
         else:
             winner, second = self._update_winner(s)
             self._adapt_neighborhood(winner, second, s)
-            self._prune_edges()
-            highest_error_node = self._prune_nodes()
-            self._add_node(highest_error_node)
+            
+            if not self.early_stopping():
+                self._prune_edges()
+                self._prune_nodes_by_isolation()
+                highest_error_node = self._prune_nodes_by_utility()
+                self._add_node_interpolation(highest_error_node)
+                self.i+=1
             self._discount()
 
-        self.i+=1
         self.initialized = False if len(self.g.get_vertices()) < 2 else True
-        #self.g.shrink_to_fit()
 
         # Stats
         self.stats["global_error"].append(np.mean(self.g.vp.error.get_array()))
         self.stats["global_utility"].append(np.mean(self.g.vp.utility.get_array()))
-        self.stats["graph_order"].append(len(self.g.get_vertices()))
-        self.stats["graph_size"].append(len(self.g.get_edges()))
+        self.stats["vertices"].append(len(self.g.get_vertices()))
+        self.stats["edges"].append(len(self.g.get_edges()))
         if debug:
             #TODO: send data to graph here
             self.print_stats()
@@ -257,6 +310,6 @@ class GrowingNeuralGas():
 
         print("Iterations: ", self.i)
         print("Graph properties: ")
-        print("\t Order: {}".format(self.stats["graph_order"][self.i]))
-        print("\t Size: {}".format(self.stats["graph_size"][self.i]))
+        print("\t Order: {}".format(self.stats["vertices"][self.i]))
+        print("\t Size: {}".format(self.stats["edges"][self.i]))
         print("\t Global error: {}".format(self.stats["global_error"][self.i]))

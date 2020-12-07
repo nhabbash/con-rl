@@ -1,5 +1,4 @@
 from .mlgng import MultiLayerGrowingNeuralGas
-from .qlearning import QLearningAgent
 import numpy as np
 import time
 
@@ -17,14 +16,16 @@ class ConRL():
     @author: Nassim Habbash
     '''
 
-    def __init__(self, action_size, state_size, update_threshold = 20):
+    def __init__(self, action_size, state_size, update_threshold = 20, discount = 1.0):
         self.action_size = action_size
         self.state_size = state_size
+        self.discount = discount
+        self.episode = 0
 
         shape = state_size + (self.action_size, )
         self.action_counter = np.zeros(shape=shape)
         self.update_threshold = update_threshold
-
+        
     def init_support(self, support):
         self.support = support
 
@@ -32,6 +33,28 @@ class ConRL():
         self.mlgng = MultiLayerGrowingNeuralGas(m=self.action_size, ndim=params["ndim"])
         self.mlgng.set_layers_parameters(params, m=-1)
 
+    def init_adaptive_lr_params(self):
+        self.m = 0
+        self.v = 0
+        self.lr = 1
+        self.alpha = 1
+        self.epsilon = 10e-8
+        self.beta1 = 0.9
+        self.beta2 = 0.9999
+
+    def update_lr(self, t):
+
+        #g = self.rewards[self.episode]-self.rewards[self.episode-1]
+        g = (self.rewards[self.episode]-self.rewards[self.episode-2])/2
+        self.m = self.beta1*self.m+(1-self.beta1)*g
+        self.v = self.beta2*self.v+(1-self.beta2)*g**2
+        m_s = self.m/(1-self.beta1**t)
+        v_s = self.v/(1-self.beta2**t)
+        self.lr = self.alpha*m_s/(np.sqrt(v_s)+self.epsilon)
+    
+    def decay_param(self, param, episode, decay_rate=0.015, func=lambda x, y: np.exp(-x*y)):
+        setattr(self, param, func(decay_rate, episode))
+        
     def simple_action_selector(self, state):
         '''
         Action selection, if MLGNG has an action, select it, otherwise get it from QL
@@ -63,18 +86,33 @@ class ConRL():
         '''
 
         # Consecutive action counter update
-        # If the counter for an incoming (state, action) pair is 0, reset the counter for all state's actions to start a new consecutive count
+        # If the counter for an incoming (state, action) pair is 0, 
+        # reset the counter for all state's actions to start a new consecutive count
         if self.action_counter[state][support_best_action] == 0:
             self.action_counter[state] = 0
         
         self.action_counter[state][support_best_action] += 1
 
         # MLGNG Agent update
+
         if self.action_counter[state][support_best_action] >= self.update_threshold:
-            support_best_action = self.support.policy(state, exploitation=True)
             self.mlgng.update(state, support_best_action)
-            self.mlgng.update_discount_rate(self.support.epsilon) # TODO remove dependance from support
+            self.mlgng.update_discount_rate(np.abs(self.lr))
             self.action_counter[state] = 0
+
+    def discount_selector(self):
+        if self.episode >= 10:
+            lower_window = self.episode-10
+        else:
+            lower_window = 0
+
+        # If low variance (flat area of the reward) and low reward compared to the past, or LR negative (reward is falling down), use the exponential discount
+        #
+        #     np.mean(self.rewards[lower_window:self.episode]) <= self.max_avg_reward) or self.lr < 0:
+        if np.std(self.rewards[lower_window:self.episode]) <= 50:
+            return self.discount
+        else:
+            return self.lr
 
     def step(self, state, env):
         '''
@@ -100,9 +138,14 @@ class ConRL():
         return next_state, reward, done, selected
 
 
-    def train(self, env, num_episodes, stats):
-        
+    def train(self, env, num_episodes, stats, print_freq=50):
+        print("#### Starting training #####")
+        self.rewards = stats["cumulative_reward"]
+        self.max_avg_reward = np.NINF
+
+        self.init_adaptive_lr_params()
         for episode in range(num_episodes):
+            self.episode = episode
             done = False
             step = 0
             cumulative_reward = 0
@@ -119,26 +162,39 @@ class ConRL():
                 selector_sequence.append(selected)
                 step+=1
 
-            self.support.decay_param("epsilon")
-
             stats["selector"][episode] = sum(selector_sequence)/len(selector_sequence)
             stats["cumulative_reward"][episode] = cumulative_reward
             stats["step"][episode] = step 
             stats["global_error"][episode] = self.mlgng.get_last_stat_tuple("global_error")
             stats["best_actions"].append(self.get_best_actions())
             stats["mlgng_nodes"].append(self.mlgng.get_nodes())
+            stats["nodes"][episode] = self.mlgng.get_last_stat_tuple("vertices")
+            stats["rate"][episode] = np.abs(self.lr)
 
-                
-            end = time.time() - start
-            if (episode+1) % 50 == 0:
-                print("Episode {}/{}, Average Max Reward: {}, Global Error: {:.2f}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
+            self.update_lr(episode)
+            self.decay_param("discount", episode, decay_rate=0.015)
+            self.support.epsilon = self.discount
+
+            if self.episode >= 10:
+                lower_window = self.episode-10
+            else:
+                lower_window = 0
+            
+            mean_reward = self.rewards[lower_window:self.episode].mean()
+            if mean_reward > self.max_avg_reward:
+                self.max_avg_reward = mean_reward
+            
+            stats["max_avg_reward"][episode] = self.max_avg_reward
+
+            if (episode+1) % print_freq == 0:
+                end = time.time() - start
+                print("Episode {}/{}, Average Max Reward: {:.2f}, Global Error: {:.2f}, Total steps {}, Discount: {:.2f}, Time {:.3f}".format(
                     episode+1, 
                     num_episodes, 
-                    stats["cumulative_reward"][episode-10:episode].mean(),
+                    stats["cumulative_reward"][episode-print_freq+1:episode].mean(),
                     stats["global_error"][episode].sum(),
                     stats["step"][episode], 
-                    self.support.epsilon, 
-                    self.support.alpha, 
+                    self.lr, 
                     end))
                 self.mlgng.print_stats(one_line=True)
 

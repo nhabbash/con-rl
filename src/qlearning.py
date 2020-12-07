@@ -38,9 +38,9 @@ class QLearningAgent:
             self.epsilon_decay_rate = kwargs["epsilon_decay_rate"]
             self.min_epsilon = kwargs["min_epsilon"]
         
-        # Q Table, initialized with random Q values between -2 and 0
+        # Q Table
         shape = self.state_size + (self.action_size, )
-        self.Q  = np.random.uniform(low=-2, high=0, size=shape)
+        self.Q  = np.random.uniform(low=0, high=0, size=shape)
 
         # Misc
         self.debug = False
