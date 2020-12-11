@@ -24,8 +24,12 @@ def get_discrete_state(state, window_size, env):
 class DiscretizationWrapper(gym.ObservationWrapper):
     def __init__(self, env, state_size):
         super().__init__(env)
-        self.window_size = (env.observation_space.high - env.observation_space.low)/state_size
+        self.state_size = state_size
+        self.window_size = (env.observation_space.high - env.observation_space.low)/self.state_size
     
     def observation(self, obs):
         discrete_state = (obs - self.env.observation_space.low)/self.window_size
-        return tuple(discrete_state.astype(np.int))
+        discrete_state = discrete_state.astype(np.int)
+        discrete_state = [np.clip(state, 0, self.state_size[idx]-1) 
+        for idx, state in enumerate(discrete_state)]
+        return tuple(discrete_state)

@@ -30,11 +30,25 @@ class GrowingNeuralGas():
     @author: Nassim Habbash
     '''
 
-    def __init__(self, ndim, id=0, discount_rate=1, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
+    def __init__(self, 
+                ndim, 
+                id=0, 
+                discount_rate=1, 
+                e_w=0.5, 
+                e_n=0.1, 
+                l=10, 
+                a=0.5, 
+                b=0.05, 
+                k=1000.0, 
+                max_nodes=100, 
+                max_age=200, 
+                node_multiplier=10, 
+                min_error=5):
         
         self.g = Graph(directed=False)
         self.id = id
         self.ndim = ndim
+
         self.e_w = e_w
         self.e_n = e_n
         self.l = l
@@ -44,6 +58,8 @@ class GrowingNeuralGas():
         self.discount_rate = discount_rate
         self.max_nodes = max_nodes
         self.max_age = max_age
+        self.node_multiplier = node_multiplier
+        self.min_error = min_error
         self.i = 0
         self.initialized = False
 
@@ -64,7 +80,20 @@ class GrowingNeuralGas():
         # graph-tools properties
         self.g.set_fast_edge_removal(fast=True)
     
-    def set_parameters(self, ndim, discount_rate=1, e_w=0.5, e_n=0.1, l=10, a=0.5, b=0.05, k=1000.0, max_nodes=100, max_age=200):
+    def set_parameters(self, 
+                ndim, 
+                discount_rate=1, 
+                e_w=0.5,
+                e_n=0.1, 
+                l=10, 
+                a=0.5, 
+                b=0.05, 
+                k=1000.0, 
+                max_nodes=100, 
+                max_age=200,
+                node_multiplier=10, 
+                min_error=5):
+                
         self.e_w = e_w
         self.e_n = e_n
         self.l = l
@@ -75,6 +104,8 @@ class GrowingNeuralGas():
         self.max_nodes = max_nodes
         self.max_age = max_age
         self.ndim = ndim
+        self.node_multiplier = node_multiplier
+        self.min_error = min_error
 
     def update_discount_rate(self, discount_rate):
         self.discount_rate = discount_rate
@@ -273,8 +304,8 @@ class GrowingNeuralGas():
         global_error = np.mean(self.g.vp.error.get_array())
         num_nodes = len(self.g.get_vertices())
 
-        error_condition = global_error <= num_nodes*10
-        zero_condition = global_error > 5
+        error_condition = global_error <= num_nodes*self.node_multiplier
+        zero_condition = global_error > self.min_error
 
         return error_condition and zero_condition
     
