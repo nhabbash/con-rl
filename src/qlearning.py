@@ -110,8 +110,6 @@ class QLearningAgent:
         action = self.policy(state)
         next_state, reward, done, _ = env.step(action)
         self.update(state, next_state, action, reward)
-        state = next_state
-
         return next_state, reward, done
 
     def train(self, env, num_episodes, stats):
@@ -141,6 +139,41 @@ class QLearningAgent:
                 print("Episode {}/{}, Reward {}, Average Max Reward: {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
                     episode+1, 
                     num_episodes, 
+                    stats["cumulative_reward"][episode],
+                    stats["cumulative_reward"][episode-10:episode].mean(),
+                    stats["step"][episode], 
+                    self.epsilon, 
+                    self.alpha,
+                    end))
+
+    def evaluate(self, env, stats, episode=0):
+            done = False
+            step = 0
+            cumulative_reward = 0
+
+            start = time.time()
+            state = env.reset()
+
+            while not done:
+                if not isinstance(state, tuple):
+                    state = (state, )
+
+                action = self.policy(state, exploitation=True)
+                next_state, reward, done, _ = env.step(action)
+                state = next_state
+                step+=1
+                cumulative_reward+=reward
+            self.decay_param("epsilon")
+
+            stats["cumulative_reward"][episode] = cumulative_reward
+            stats["step"][episode] = step 
+            stats["q_tables"][episode] = self.Q
+            stats["best_actions"].append(self.get_best_actions())
+
+            end = time.time() - start
+            if (episode+1) % 50 == 0:
+                print("#### QL: Episode {}, Reward {}, Average Max Reward: {}, Total steps {}, Epsilon: {:.2f}, Alpha: {:.2f}, Time {:.3f}".format(
+                    episode+1,
                     stats["cumulative_reward"][episode],
                     stats["cumulative_reward"][episode-10:episode].mean(),
                     stats["step"][episode], 
