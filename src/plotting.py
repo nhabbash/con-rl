@@ -183,6 +183,7 @@ def plot_stats(stats,
     fig.tight_layout()
 
 def plot_stats_comparison(stats_dict,
+                            subplots=2,
                             rolling_window=10,
                             def_plot=None,
                             figsize=(10, 6),
@@ -191,7 +192,7 @@ def plot_stats_comparison(stats_dict,
 
 
     if def_plot is None:
-        fig, ax = plt.subplots(nrows=len(stats_dict), figsize=figsize)
+        fig, ax = plt.subplots(nrows=subplots, figsize=figsize)
     else:
         fig, ax = def_plot
 
