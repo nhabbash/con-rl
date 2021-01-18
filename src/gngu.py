@@ -316,12 +316,12 @@ class GrowingNeuralGas():
             winner, second = self._update_winner(s)
             self._adapt_neighborhood(winner, second, s)
             
-            if not self.early_stopping():
-                self._prune_edges()
-                self._prune_nodes_by_isolation()
-                highest_error_node = self._prune_nodes_by_utility()
-                self._add_node_interpolation(highest_error_node)
-                self.i+=1
+            #if not self.early_stopping():
+            self._prune_edges()
+            self._prune_nodes_by_isolation()
+            highest_error_node = self._prune_nodes_by_utility()
+            self._add_node_interpolation(highest_error_node)
+            self.i+=1
             self._discount()
 
         self.initialized = False if len(self.g.get_vertices()) < 2 else True

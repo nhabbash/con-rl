@@ -97,7 +97,8 @@ class ConRL():
 
         if self.action_counter[state][support_best_action] >= self.update_threshold:
             self.mlgng.update(state, support_best_action)
-            self.mlgng.update_discount_rate(self.discount_selector())
+            #self.mlgng.update_discount_rate(self.discount_selector())
+            self.mlgng.update_discount_rate(self.support.epsilon)
             self.action_counter[state] = 0
 
     def discount_selector(self):
@@ -175,17 +176,19 @@ class ConRL():
             stats["nodes"][episode] = self.mlgng.get_last_stat_tuple("vertices")
             stats["rate"][episode] = self.discount_selector()
 
-            self.update_lr(episode)
+            #self.update_lr(episode)
             self.decay_param("discount", episode, decay_rate=0.015)
             self.support.epsilon = self.discount
             #self.mlgng.update_discount_rate(self.support.epsilon)
 
-            if self.episode >= 10:
-                lower_window = self.episode-10
+            if self.episode >= print_freq:
+                lower_bound = self.episode-print_freq
+                higher_bound = self.episode
             else:
-                lower_window = 0
+                lower_bound = 0
+                higher_bound = self.episode+1
             
-            mean_reward = self.rewards[lower_window:self.episode].mean()
+            mean_reward = self.rewards[lower_bound:higher_bound].mean()
             if mean_reward > self.max_avg_reward:
                 self.max_avg_reward = mean_reward
             
@@ -193,10 +196,10 @@ class ConRL():
 
             if (episode+1) % print_freq == 0:
                 end = time.time() - start
-                print("Episode {}/{}, Average Max Reward: {:.2f}, Global Error: {:.2f}, Total steps {}, Discount: {:.2f}, Time {:.3f}".format(
+                print("Episode {}/{}, Average Reward: {:.2f}, Global Error: {:.2f}, Total steps {}, Discount: {:.2f}, Time {:.3f}".format(
                     episode+1, 
                     num_episodes, 
-                    stats["cumulative_reward"][episode-print_freq+1:episode].mean(),
+                    stats["cumulative_reward"][lower_bound:higher_bound].mean(),
                     stats["global_error"][episode].sum(),
                     stats["step"][episode],
                     self.discount,
