@@ -2,6 +2,18 @@ from collections import namedtuple
 import numpy as np
 import gym
 
+def build_conrl_stats(num_episodes, env):
+    return {
+            "step":  np.zeros(num_episodes),
+            "cumulative_reward":  np.zeros(num_episodes),
+            "selector":    np.zeros(num_episodes),
+            "global_error":     np.zeros((num_episodes, env.action_space.n)),
+            "mlgng_nodes":      [],
+            "best_actions":     [],
+            "nodes": np.zeros((num_episodes, env.action_space.n)),
+            "rate": np.zeros(num_episodes),
+            "max_avg_reward": np.zeros(num_episodes),
+    }
 
 def dict_to_namedtuple(dict):
     nt = namedtuple('nt', dict)

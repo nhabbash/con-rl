@@ -178,6 +178,7 @@ class ConRL():
             self.update_lr(episode)
             self.decay_param("discount", episode, decay_rate=0.015)
             self.support.epsilon = self.discount
+            #self.mlgng.update_discount_rate(self.support.epsilon)
 
             if self.episode >= 10:
                 lower_window = self.episode-10
@@ -197,7 +198,8 @@ class ConRL():
                     num_episodes, 
                     stats["cumulative_reward"][episode-print_freq+1:episode].mean(),
                     stats["global_error"][episode].sum(),
-                    stats["step"][episode], 
+                    stats["step"][episode],
+                    self.discount,
                     stats["rate"][episode], 
                     end))
                 self.mlgng.print_stats(one_line=True)

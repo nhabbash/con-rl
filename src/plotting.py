@@ -193,6 +193,8 @@ def plot_stats_comparison(stats_dict,
 
     if def_plot is None:
         fig, ax = plt.subplots(nrows=subplots, figsize=figsize)
+        if subplots==1:
+            ax = [ax]
     else:
         fig, ax = def_plot
 
@@ -305,6 +307,8 @@ def plot_nodes_3d(nodes,
                 round=False, 
                 axis_names=["X", "Y", "Z"],
                 def_plot=None,
+                full_proj=True,
+                policy=None,
                 figsize=(10, 10),
                 legend=False):
     
@@ -330,7 +334,7 @@ def plot_nodes_3d(nodes,
     layered_nodes = [nodes[:, nodes[-1]==i] for i in range(len(action_names))]
     for i, nodes in enumerate(layered_nodes):
         x, y, _ = nodes
-        ax.scatter(x, y, i, marker=symbols[i], s=100, c=[colors[i]], label="Action: {}".format(action_names[i]))
+        ax.scatter(x, y, i, marker=symbols[i], s=160, c=[colors[i]], label="Action: {}".format(action_names[i]))
         
         p = Rectangle((0,0), state_size[0], state_size[1], color=colors[i], alpha=0.15)
         # grid lines
@@ -339,32 +343,60 @@ def plot_nodes_3d(nodes,
         for y in gy:
             ax.plot3D([gx[0], gx[-1]], [y, y], i, color=colors[i], alpha=.7, linestyle=':')
 
+        bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.95)
+        ax.text(0, 8, i, "Action {}".format(i), fontsize=15, bbox=bbox_props)
         ax.add_patch(p)
         art3d.pathpatch_2d_to_3d(p, z=i, zdir="z")
 
+
+    if full_proj:
+        for i, nodes in enumerate(layered_nodes):
+            x, y, _ = nodes
+            ax.scatter(x, y, -1, marker=symbols[i], s=100, c=[colors[i]])
+
+        for x in gx:
+            ax.plot3D([x, x], [gy[0], gy[-1]], -1, color="grey", alpha=.7, linestyle=':')
+        for y in gy:
+            ax.plot3D([gx[0], gx[-1]], [y, y], -1, color="grey", alpha=.7, linestyle=':')
+        
+        if policy is not None:
+            layered_nodes = [policy[:, policy[-1]==i] for i in range(len(action_names))]
+            for i, nodes in enumerate(layered_nodes):
+                x, y, _ = nodes
+                for xx, yy in zip(x, y):
+                    p = Rectangle((xx, yy), 1, 1, color=colors[i], alpha=0.4)
+                    ax.add_patch(p)
+                    art3d.pathpatch_2d_to_3d(p, z=-1, zdir="z")
+
+                    bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.95)
+                    ax.text(0, 8, -1, "Projection", fontsize=15, bbox=bbox_props)
+                    
     # plot connection lines
     # ax.plot([x[0],y[0],x[0]],[y[0],x[0],y[0]],[0.4,0.9,1.6], color="k")
     # ax.plot([x[2],y[2],x[2]],[y[2],x[2],y[2]],[0.4,0.9,1.6], color="k")
     
     ax.set_xlabel(axis_names[0])
     ax.set_ylabel(axis_names[1])
-    ax.set_zlabel(axis_names[2])
+    #ax.set_zlabel(axis_names[2])
 
     ax.set_aspect('auto')
 
     # ax.set_xticks(np.arange(state_size[1]))
     # ax.set_yticks(np.arange(state_size[0]))
-    ax.set_zticks(np.arange(len(action_names)))
-
+    #ax.set_zticks(np.arange(len(action_names)))
+    ax.set_zticks([])
+    ax.axes.zaxis.set_visible(False)
+    ax.spines["top"].set_visible(False)
     ax.set_xlim(0, state_size[0])
     ax.set_ylim(0, state_size[1])
     # ax.set_xticks(np.arange(state_size[0]))
     # ax.set_yticks(np.arange(state_size[1]))
     
     ax.grid(False)
-    #ax.view_init(elev=15., azim=60)
+    ax.view_init(elev=10., azim=45)
     plt.title(title)
-    plt.legend()
+    if legend:
+        plt.legend(bbox_to_anchor=(0, 0.01, 1,0.2), loc="lower left",mode="expand", borderaxespad=0, ncol=len(action_names))
     plt.show()
 
 def plot_nodes_changes(stats_series, rewards, action_names, symbols, colors, frequency=10, figsize=(600, 600)):
