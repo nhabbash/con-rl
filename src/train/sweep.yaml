@@ -1,38 +1,46 @@
 program: train.py
 method: bayes
 metric:
-  name: reward
+  name: cumulative_reward
   goal: maximize
 parameters:
   mlgng_params.a:
     distribution: uniform
-    min: 0.25
-    max: 1
+    min: 0.1614324616614246
+    max: 1.9133058105443104
   mlgng_params.b:
     distribution: uniform
-    min: 0.01
-    max: 0.95
+    min: 0.19957785092590963
+    max: 1.5134887891254827
   mlgng_params.k:
     distribution: int_uniform
-    min: 500
-    max: 2000
+    min: 287
+    max: 3408
   mlgng_params.l:
     distribution: int_uniform
     min: 5
-    max: 20
+    max: 28
   mlgng_params.e_n:
     distribution: uniform
-    min: 0.05
-    max: 0.2
+    min: 0.04503974167783826
+    max: 0.37837140407866127
   mlgng_params.e_w:
     distribution: uniform
-    min: 0.25
-    max: 1
+    min: 0.26402812300980427
+    max: 1.881483278598084
   mlgng_params.max_age:
     distribution: int_uniform
-    min: 5
-    max: 20
+    min: 3
+    max: 28
   mlgng_params.max_nodes:
     distribution: int_uniform
+    min: 4
+    max: 36
+  mlgng_params.min_error:
+    distribution: uniform
+    min: 2
+    max: 10
+  mlgng_params.node_multiplier:
+    distribution: uniform
     min: 5
-    max: 20
+    max: 15

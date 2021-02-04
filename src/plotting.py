@@ -154,11 +154,14 @@ def plot_stats(stats,
                 def_plot=None,
                 figsize=(10, 6),
                 label=None,
-                title = None
+                title = None,
+                single_x_label=True
                 ):
 
     if def_plot is None:
         fig, ax = plt.subplots(nrows=len(stats), figsize=figsize)
+        if len(stats)==1:
+            ax = [ax]
     else:
         fig, ax = def_plot
 
@@ -174,9 +177,12 @@ def plot_stats(stats,
 
         ax[i].plot(ma.index, ma, color=colors[i], label=label)
         ax[i].fill_between(mstd.index, lower_bound, upper_bound, alpha=0.15, color=colors[i])
-        ax[i].set_xlabel("episode")
+        if not single_x_label:
+            ax[i].set_xlabel("episode")
         ax[i].set_ylabel(key.replace("_", " "))
     
+    if single_x_label:
+        ax[-1].set_xlabel("episode")
     if title:
         fig.suptitle(title)
 

@@ -260,7 +260,7 @@ class GrowingNeuralGas():
             v = self.g.add_vertex()
             self.g.vp.error[v] = self.g.vp.error[highest_error_node]
             self.g.vp.utility[v] = self.g.vp.utility[highest_error_node]
-            self.g.vp.pos[v] = self.g.vp.pos[highest_error_node] + np.random.normal(0, 1, self.ndim)
+            self.g.vp.pos[v] = self.g.vp.pos[highest_error_node] + np.random.normal(0, 0.3, self.ndim)
 
             edge_list = np.full((neighbors.shape[0], 2), int(v))
             edge_list[:, -1] = neighbors
