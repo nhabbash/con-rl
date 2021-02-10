@@ -240,7 +240,9 @@ class GrowingNeuralGas():
 
                 self.g.add_edge_list([  [v, highest_error_node], 
                                         [v, highest_error_neighbor]])
-                
+                edge = self.g.edge(highest_error_node, highest_error_neighbor)
+                self.g.remove_edge(edge)
+
                 self.g.vp.error[highest_error_node] *= self.a
                 self.g.vp.error[highest_error_neighbor] *= self.a
                 self.g.vp.utility[highest_error_node] *= self.a

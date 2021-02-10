@@ -92,6 +92,7 @@ class SarsaLambdaAgent:
 
     def train(self, env, num_episodes, stats):
 
+        train_start = time.time()
         for episode in range(num_episodes):
             done = False
             step = 0
@@ -130,6 +131,7 @@ class SarsaLambdaAgent:
                     self.epsilon, 
                     self.alpha,
                     end))
+        print("#### Finished training in : {:.3f}".format(time.time() - train_start))
 
     def evaluate(self, env, stats, episode=0):
             done = False

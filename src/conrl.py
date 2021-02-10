@@ -5,13 +5,13 @@ import time
 class ConRL():
     '''
     Constructivist Reinforcement Learning
-    from Gueriau et al, 2019
 
     Attributes:
-        support (): Supporting agent
-        mlgng (): MLGNG agent
+        support (RL algorithm instance): Supporting agent
+        mlgng (MLGNG instance): MLGNG agent
         action_counter (dict of dict): A nested dictionary that maps state -> (action -> counter).
-        ndim (int): State space dimensionality
+        state_size (tuple of int): State space dimensionality
+        action_size (int): Action space dimensionality
         update_threshold (int): Update threshold for each action layer of MLGNG
     @author: Nassim Habbash
     '''
@@ -146,6 +146,7 @@ class ConRL():
         print("#### Starting training #####")
         self.rewards = stats["cumulative_reward"]
         self.max_avg_reward = np.NINF
+        train_start = time.time()
 
         self.init_adaptive_lr_params()
         for episode in range(num_episodes):
@@ -205,6 +206,8 @@ class ConRL():
                     stats["rate"][episode], 
                     end))
                 self.mlgng.print_stats(one_line=True)
+
+        print("#### Finished training in : {:.3f}".format(time.time() - train_start))
 
     def get_best_actions(self):
         length = np.prod(self.state_size)
