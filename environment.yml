@@ -174,6 +174,7 @@ dependencies:
     - gym==0.17.3
     - idna==2.10
     - imageio==2.9.0
+    - joblib==0.17.0
     - lockfile==0.12.2
     - opencv-python==4.4.0.46
     - pathtools==0.1.2
@@ -183,11 +184,14 @@ dependencies:
     - pyglet==1.5.0
     - pyyaml==5.3.1
     - requests==2.24.0
+    - scikit-learn==0.23.2
     - seaborn==0.11.0
     - sentry-sdk==0.19.2
     - shortuuid==1.0.1
+    - sklearn==0.0
     - smmap==3.0.4
     - subprocess32==3.5.4
+    - threadpoolctl==2.1.0
     - urllib3==1.26.0
     - wandb==0.10.10
     - watchdog==0.10.3
